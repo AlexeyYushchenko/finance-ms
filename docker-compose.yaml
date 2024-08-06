@@ -1,0 +1,12 @@
+version: '3.9'
+
+services:
+  financialmanagement:
+    container_name: financial_management_container
+    image: postgres:15.2
+    environment:
+      POSTGRES_DB: financial_management
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5437:5432"
