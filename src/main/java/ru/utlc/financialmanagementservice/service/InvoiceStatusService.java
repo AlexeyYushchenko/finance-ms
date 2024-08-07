@@ -8,16 +8,17 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.invoicestatus.InvoiceStatusCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.invoicestatus.InvoiceStatusReadDto;
 import ru.utlc.financialmanagementservice.exception.InvoiceStatusCreationException;
 import ru.utlc.financialmanagementservice.mapper.InvoiceStatusMapper;
 import ru.utlc.financialmanagementservice.repository.InvoiceStatusRepository;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 
-import static ru.utlc.financialmanagementservice.constants.CacheNames.*;
+import static ru.utlc.financialmanagementservice.constants.CacheNames.INVOICE_STATUSES;
 
 @Slf4j
 @Service
@@ -29,50 +30,45 @@ public class InvoiceStatusService {
     private final CacheManager cacheManager;
 
     @Cacheable(value = INVOICE_STATUSES, key = "'all'")
-    public List<InvoiceStatusReadDto> findAll() {
-        List<InvoiceStatusReadDto> list = invoiceStatusRepository.findAll().stream()
+    public Flux<InvoiceStatusReadDto> findAll() {
+        return invoiceStatusRepository.findAll()
                 .map(invoiceStatusMapper::toDto)
-                .toList();
-
-        list.forEach(entity -> cacheManager.getCache(INVOICE_STATUSES).put(entity.id(), entity));
-        return list;
+                .doOnNext(entity -> Objects.requireNonNull(cacheManager.getCache(INVOICE_STATUSES)).put(entity.id(), entity));
     }
 
     @Cacheable(value = INVOICE_STATUSES, key = "#p0")
-    public Optional<InvoiceStatusReadDto> findById(Integer id) {
-        return invoiceStatusRepository.findById(id).map(invoiceStatusMapper::toDto);
-    }
-
-    @Transactional
-    @CacheEvict(value = INVOICE_STATUSES, allEntries = true)
-    @CachePut(value = INVOICE_STATUSES, key = "#result.id")
-    public InvoiceStatusReadDto create(InvoiceStatusCreateUpdateDto createUpdateDto) throws InvoiceStatusCreationException {
-        return Optional.of(createUpdateDto)
-                .map(invoiceStatusMapper::toEntity)
-                .map(invoiceStatusRepository::save)
-                .map(invoiceStatusMapper::toDto)
-                .orElseThrow(() -> new InvoiceStatusCreationException("error.entity.invoiceStatus.creation"));
-    }
-
-    @Transactional
-    @CacheEvict(value = INVOICE_STATUSES, allEntries = true)
-    @CachePut(value = INVOICE_STATUSES, key = "#result.id")
-    public Optional<InvoiceStatusReadDto> update(Integer id, InvoiceStatusCreateUpdateDto dto) {
+    public Mono<InvoiceStatusReadDto> findById(Integer id) {
         return invoiceStatusRepository.findById(id)
-                .map(entity -> invoiceStatusMapper.update(entity, dto))
-                .map(invoiceStatusRepository::saveAndFlush)
                 .map(invoiceStatusMapper::toDto);
     }
 
     @Transactional
-    @CacheEvict(value = INVOICE_STATUSES, allEntries = true)
-    public boolean delete(Integer id) {
+    @CacheEvict(value = INVOICE_STATUSES, key = "'all'")
+    @CachePut(value = INVOICE_STATUSES, key = "#result.id")
+    public Mono<InvoiceStatusReadDto> create(InvoiceStatusCreateUpdateDto dto) {
+        return Mono.just(dto)
+                .map(invoiceStatusMapper::toEntity)
+                .flatMap(invoiceStatusRepository::save)
+                .map(invoiceStatusMapper::toDto)
+                .onErrorMap(e -> new InvoiceStatusCreationException("error.entity.invoiceStatus.creation"));
+    }
+
+    @Transactional
+    @CacheEvict(value = INVOICE_STATUSES, key = "'all'")
+    @CachePut(value = INVOICE_STATUSES, key = "#result.id")
+    public Mono<InvoiceStatusReadDto> update(Integer id, InvoiceStatusCreateUpdateDto dto) {
         return invoiceStatusRepository.findById(id)
-                .map(invoiceStatus -> {
-                    invoiceStatusRepository.delete(invoiceStatus);
-                    invoiceStatusRepository.flush();
-                    return true;
-                })
-                .orElse(false);
+                .flatMap(entity -> Mono.just(invoiceStatusMapper.update(entity, dto)))
+                .flatMap(invoiceStatusRepository::save)
+                .map(invoiceStatusMapper::toDto);
+    }
+
+    @Transactional
+    @CacheEvict(value = INVOICE_STATUSES, allEntries = true) //todo improve by selectively deleting only the cached entity while updating 'all'.
+    public Mono<Boolean> delete(Integer id) {
+        return invoiceStatusRepository.findById(id)
+                .flatMap(invoiceStatus -> invoiceStatusRepository.delete(invoiceStatus)
+                        .thenReturn(true))
+                .defaultIfEmpty(false);
     }
 }

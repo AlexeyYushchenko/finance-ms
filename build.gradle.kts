@@ -38,9 +38,9 @@ dependencies {
 	implementation("io.github.resilience4j:resilience4j-circuitbreaker:1.7.0")
 	implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
 
-//	implementation ("org.springframework.boot:spring-boot-starter-data-r2dbc")
-//	implementation ("io.r2dbc:r2dbc-postgresql")
-//	implementation ("io.r2dbc:r2dbc-testcontainers")
+	implementation ("org.springframework.boot:spring-boot-starter-data-r2dbc")
+	implementation ("io.r2dbc:r2dbc-postgresql")
+	implementation ("io.r2dbc:r2dbc-testcontainers")
 
 	developmentOnly("org.springframework.boot:spring-boot-docker-compose")
 	runtimeOnly("org.postgresql:postgresql")

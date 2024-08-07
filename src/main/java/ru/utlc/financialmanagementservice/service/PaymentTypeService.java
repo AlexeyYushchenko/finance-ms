@@ -8,14 +8,15 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeReadDto;
 import ru.utlc.financialmanagementservice.exception.PaymentTypeCreationException;
 import ru.utlc.financialmanagementservice.mapper.PaymentTypeMapper;
 import ru.utlc.financialmanagementservice.repository.PaymentTypeRepository;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 
 import static ru.utlc.financialmanagementservice.constants.CacheNames.PAYMENT_TYPES;
 
@@ -29,50 +30,45 @@ public class PaymentTypeService {
     private final CacheManager cacheManager;
 
     @Cacheable(value = PAYMENT_TYPES, key = "'all'")
-    public List<PaymentTypeReadDto> findAll() {
-        List<PaymentTypeReadDto> list = paymentTypeRepository.findAll().stream()
+    public Flux<PaymentTypeReadDto> findAll() {
+        return paymentTypeRepository.findAll()
                 .map(paymentTypeMapper::toDto)
-                .toList();
-
-        list.forEach(entity -> cacheManager.getCache(PAYMENT_TYPES).put(entity.id(), entity));
-        return list;
+                .doOnNext(entity -> Objects.requireNonNull(cacheManager.getCache(PAYMENT_TYPES)).put(entity.id(), entity));
     }
 
     @Cacheable(value = PAYMENT_TYPES, key = "#p0")
-    public Optional<PaymentTypeReadDto> findById(Integer id) {
-        return paymentTypeRepository.findById(id).map(paymentTypeMapper::toDto);
-    }
-
-    @Transactional
-    @CacheEvict(value = PAYMENT_TYPES, allEntries = true)
-    @CachePut(value = PAYMENT_TYPES, key = "#result.id")
-    public PaymentTypeReadDto create(PaymentTypeCreateUpdateDto createUpdateDto) throws PaymentTypeCreationException {
-        return Optional.of(createUpdateDto)
-                .map(paymentTypeMapper::toEntity)
-                .map(paymentTypeRepository::save)
-                .map(paymentTypeMapper::toDto)
-                .orElseThrow(() -> new PaymentTypeCreationException("error.entity.paymentType.creation"));
-    }
-
-    @Transactional
-    @CacheEvict(value = PAYMENT_TYPES, allEntries = true)
-    @CachePut(value = PAYMENT_TYPES, key = "#result.id")
-    public Optional<PaymentTypeReadDto> update(Integer id, PaymentTypeCreateUpdateDto dto) {
+    public Mono<PaymentTypeReadDto> findById(Integer id) {
         return paymentTypeRepository.findById(id)
-                .map(entity -> paymentTypeMapper.update(entity, dto))
-                .map(paymentTypeRepository::saveAndFlush)
                 .map(paymentTypeMapper::toDto);
     }
 
     @Transactional
-    @CacheEvict(value = PAYMENT_TYPES, allEntries = true)
-    public boolean delete(Integer id) {
+    @CacheEvict(value = PAYMENT_TYPES, key = "'all'")
+    @CachePut(value = PAYMENT_TYPES, key = "#result.id")
+    public Mono<PaymentTypeReadDto> create(PaymentTypeCreateUpdateDto dto) {
+        return Mono.just(dto)
+                .map(paymentTypeMapper::toEntity)
+                .flatMap(paymentTypeRepository::save)
+                .map(paymentTypeMapper::toDto)
+                .onErrorMap(e -> new PaymentTypeCreationException("error.entity.paymentType.creation"));
+    }
+
+    @Transactional
+    @CacheEvict(value = PAYMENT_TYPES, key = "'all'")
+    @CachePut(value = PAYMENT_TYPES, key = "#result.id")
+    public Mono<PaymentTypeReadDto> update(Integer id, PaymentTypeCreateUpdateDto dto) {
         return paymentTypeRepository.findById(id)
-                .map(paymentType -> {
-                    paymentTypeRepository.delete(paymentType);
-                    paymentTypeRepository.flush();
-                    return true;
-                })
-                .orElse(false);
+                .flatMap(entity -> Mono.just(paymentTypeMapper.update(entity, dto)))
+                .flatMap(paymentTypeRepository::save)
+                .map(paymentTypeMapper::toDto);
+    }
+
+    @Transactional
+    @CacheEvict(value = PAYMENT_TYPES, allEntries = true) //todo improve by selectively deleting only the cached entity while updating 'all'.
+    public Mono<Boolean> delete(Integer id) {
+        return paymentTypeRepository.findById(id)
+                .flatMap(paymentType -> paymentTypeRepository.delete(paymentType)
+                        .thenReturn(true))
+                .defaultIfEmpty(false);
     }
 }

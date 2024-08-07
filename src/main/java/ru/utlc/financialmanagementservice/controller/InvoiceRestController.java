@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import ru.utlc.financialmanagementservice.dto.client.ClientReadDto;
 import ru.utlc.financialmanagementservice.dto.invoice.InvoiceCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.invoice.InvoiceEnrichedReadDto;
 import ru.utlc.financialmanagementservice.dto.invoice.InvoiceReadDto;
@@ -36,7 +37,7 @@ public class InvoiceRestController {
 
     @GetMapping
     public Mono<ResponseEntity<List<InvoiceEnrichedReadDto>>> findAll(@RequestParam(name = "language") String language) {
-        return Flux.fromIterable(invoiceService.findAll())
+        return invoiceService.findAll()
                 .flatMap(invoiceDto -> clientService.findClientById(invoiceDto.clientId(), language)
                         .map(clientReadDto -> new InvoiceEnrichedReadDto(
                                 invoiceDto.id(),
@@ -86,8 +87,67 @@ public class InvoiceRestController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<InvoiceEnrichedReadDto> findById(@PathVariable("id") final Long id, @RequestParam(name = "language") String language) {
-        Optional<InvoiceReadDto> invoiceDtoOpt = invoiceService.findById(id);
+    public Mono<ResponseEntity<InvoiceEnrichedReadDto>> findById(@PathVariable("id") final Long id, @RequestParam(name = "language") String language) {
+
+        return invoiceService.findById(id)
+                .map(invoiceDto -> clientService.findClientById(invoiceDto.clientId(), language)
+                        .map(clientReadDto -> new InvoiceEnrichedReadDto(
+                                invoiceDto.id(),
+                                clientReadDto,
+                                invoiceDto.serviceType(),
+                                invoiceDto.totalAmount(),
+                                invoiceDto.currency(),
+                                invoiceDto.issueDate(),
+                                invoiceDto.dueDate(),
+                                invoiceDto.commentary(),
+                                invoiceDto.shipmentId(),
+                                invoiceDto.invoiceStatus(),
+                                invoiceDto.auditingInfoDto()
+                        ))
+                        .defaultIfEmpty(new InvoiceEnrichedReadDto(
+                                invoiceDto.id(),
+                                null,
+                                invoiceDto.serviceType(),
+                                invoiceDto.totalAmount(),
+                                invoiceDto.currency(),
+                                invoiceDto.issueDate(),
+                                invoiceDto.dueDate(),
+                                invoiceDto.commentary(),
+                                invoiceDto.shipmentId(),
+                                invoiceDto.invoiceStatus(),
+                                invoiceDto.auditingInfoDto()
+                        ))
+                )
+                .map(ResponseEntity::ok)
+                .doOnError(ResponseEntity::notFound);
+
+
+                .map(clientReadDto -> new InvoiceEnrichedReadDto(
+                        invoiceDto.id(),
+                        clientReadDto,
+                        invoiceDto.serviceType(),
+                        invoiceDto.totalAmount(),
+                        invoiceDto.currency(),
+                        invoiceDto.issueDate(),
+                        invoiceDto.dueDate(),
+                        invoiceDto.commentary(),
+                        invoiceDto.shipmentId(),
+                        invoiceDto.invoiceStatus(),
+                        invoiceDto.auditingInfoDto()
+                ))
+                .defaultIfEmpty(new InvoiceEnrichedReadDto(
+                        invoiceDto.id(),
+                        null,
+                        invoiceDto.serviceType(),
+                        invoiceDto.totalAmount(),
+                        invoiceDto.currency(),
+                        invoiceDto.issueDate(),
+                        invoiceDto.dueDate(),
+                        invoiceDto.commentary(),
+                        invoiceDto.shipmentId(),
+                        invoiceDto.invoiceStatus(),
+                        invoiceDto.auditingInfoDto()
+                ))
 
         if (invoiceDtoOpt.isPresent()) {
             InvoiceReadDto invoiceDto = invoiceDtoOpt.get();
@@ -171,12 +231,12 @@ public class InvoiceRestController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable("id") final Long id) {
-        if (invoiceService.delete(id)) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Mono<ResponseEntity<Void>> delete(@PathVariable("id") final Long id) {
+        return invoiceService.delete(id)
+                .flatMap(deleted -> deleted
+                        ? Mono.just(new ResponseEntity<>(HttpStatus.NO_CONTENT))
+                        : Mono.just(new ResponseEntity<>(HttpStatus.NOT_FOUND))
+                );
     }
 
     private ResponseEntity<Response> handleValidationErrors(final BindingResult bindingResult) {

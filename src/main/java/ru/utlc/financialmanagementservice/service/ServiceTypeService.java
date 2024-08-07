@@ -8,14 +8,15 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeReadDto;
 import ru.utlc.financialmanagementservice.exception.ServiceTypeCreationException;
 import ru.utlc.financialmanagementservice.mapper.ServiceTypeMapper;
 import ru.utlc.financialmanagementservice.repository.ServiceTypeRepository;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 
 import static ru.utlc.financialmanagementservice.constants.CacheNames.SERVICE_TYPES;
 
@@ -29,50 +30,45 @@ public class ServiceTypeService {
     private final CacheManager cacheManager;
 
     @Cacheable(value = SERVICE_TYPES, key = "'all'")
-    public List<ServiceTypeReadDto> findAll() {
-        List<ServiceTypeReadDto> list = serviceTypeRepository.findAll().stream()
+    public Flux<ServiceTypeReadDto> findAll() {
+        return serviceTypeRepository.findAll()
                 .map(serviceTypeMapper::toDto)
-                .toList();
-
-        list.forEach(entity -> cacheManager.getCache(SERVICE_TYPES).put(entity.id(), entity));
-        return list;
+                .doOnNext(entity -> Objects.requireNonNull(cacheManager.getCache(SERVICE_TYPES)).put(entity.id(), entity));
     }
 
     @Cacheable(value = SERVICE_TYPES, key = "#p0")
-    public Optional<ServiceTypeReadDto> findById(Integer id) {
-        return serviceTypeRepository.findById(id).map(serviceTypeMapper::toDto);
-    }
-
-    @Transactional
-    @CacheEvict(value = SERVICE_TYPES, allEntries = true)
-    @CachePut(value = SERVICE_TYPES, key = "#result.id")
-    public ServiceTypeReadDto create(ServiceTypeCreateUpdateDto createUpdateDto) throws ServiceTypeCreationException {
-        return Optional.of(createUpdateDto)
-                .map(serviceTypeMapper::toEntity)
-                .map(serviceTypeRepository::save)
-                .map(serviceTypeMapper::toDto)
-                .orElseThrow(() -> new ServiceTypeCreationException("error.entity.serviceType.creation"));
-    }
-
-    @Transactional
-    @CacheEvict(value = SERVICE_TYPES, allEntries = true)
-    @CachePut(value = SERVICE_TYPES, key = "#result.id")
-    public Optional<ServiceTypeReadDto> update(Integer id, ServiceTypeCreateUpdateDto dto) {
+    public Mono<ServiceTypeReadDto> findById(Integer id) {
         return serviceTypeRepository.findById(id)
-                .map(entity -> serviceTypeMapper.update(entity, dto))
-                .map(serviceTypeRepository::saveAndFlush)
                 .map(serviceTypeMapper::toDto);
     }
 
     @Transactional
-    @CacheEvict(value = SERVICE_TYPES, allEntries = true)
-    public boolean delete(Integer id) {
+    @CacheEvict(value = SERVICE_TYPES, key = "'all'")
+    @CachePut(value = SERVICE_TYPES, key = "#result.id")
+    public Mono<ServiceTypeReadDto> create(ServiceTypeCreateUpdateDto dto) {
+        return Mono.just(dto)
+                .map(serviceTypeMapper::toEntity)
+                .flatMap(serviceTypeRepository::save)
+                .map(serviceTypeMapper::toDto)
+                .onErrorMap(e -> new ServiceTypeCreationException("error.entity.serviceType.creation"));
+    }
+
+    @Transactional
+    @CacheEvict(value = SERVICE_TYPES, key = "'all'")
+    @CachePut(value = SERVICE_TYPES, key = "#result.id")
+    public Mono<ServiceTypeReadDto> update(Integer id, ServiceTypeCreateUpdateDto dto) {
         return serviceTypeRepository.findById(id)
-                .map(serviceType -> {
-                    serviceTypeRepository.delete(serviceType);
-                    serviceTypeRepository.flush();
-                    return true;
-                })
-                .orElse(false);
+                .flatMap(entity -> Mono.just(serviceTypeMapper.update(entity, dto)))
+                .flatMap(serviceTypeRepository::save)
+                .map(serviceTypeMapper::toDto);
+    }
+
+    @Transactional
+    @CacheEvict(value = SERVICE_TYPES, allEntries = true) //todo improve by selectively deleting only the cached entity while updating 'all'.
+    public Mono<Boolean> delete(Integer id) {
+        return serviceTypeRepository.findById(id)
+                .flatMap(serviceType -> serviceTypeRepository.delete(serviceType)
+                        .thenReturn(true))
+                .defaultIfEmpty(false);
     }
 }
