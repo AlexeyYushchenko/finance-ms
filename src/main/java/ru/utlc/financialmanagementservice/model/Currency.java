@@ -1,28 +1,27 @@
 package ru.utlc.financialmanagementservice.model;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "currency")
+@Table("currency")
 public class Currency extends AuditingEntity<Integer> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "code", nullable = false, unique = true, length = 3)
+    @Column("code")
     private String code;
 
-    @Column(name = "name", length = 50)
+    @Column("name")
     private String name;
 
-    @Column(name = "enabled")
+    @Column("enabled")
     private Boolean enabled;
-
 }

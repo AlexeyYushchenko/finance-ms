@@ -49,8 +49,7 @@ public class PaymentTypeService {
         return Mono.just(dto)
                 .map(paymentTypeMapper::toEntity)
                 .flatMap(paymentTypeRepository::save)
-                .map(paymentTypeMapper::toDto)
-                .onErrorMap(e -> new PaymentTypeCreationException("error.entity.paymentType.creation"));
+                .map(paymentTypeMapper::toDto);
     }
 
     @Transactional

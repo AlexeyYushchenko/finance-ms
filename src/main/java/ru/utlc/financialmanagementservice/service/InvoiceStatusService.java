@@ -49,8 +49,7 @@ public class InvoiceStatusService {
         return Mono.just(dto)
                 .map(invoiceStatusMapper::toEntity)
                 .flatMap(invoiceStatusRepository::save)
-                .map(invoiceStatusMapper::toDto)
-                .onErrorMap(e -> new InvoiceStatusCreationException("error.entity.invoiceStatus.creation"));
+                .map(invoiceStatusMapper::toDto);
     }
 
     @Transactional

@@ -8,6 +8,5 @@ import java.util.Map;
 public record InvoiceStatusReadDto(
         Integer id,
         String name,
-        Map<String, InvoiceStatusLocalization> localizations,
         AuditingInfoDto auditingInfoDto
 ) {}

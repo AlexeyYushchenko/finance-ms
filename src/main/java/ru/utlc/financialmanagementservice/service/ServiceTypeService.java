@@ -49,8 +49,7 @@ public class ServiceTypeService {
         return Mono.just(dto)
                 .map(serviceTypeMapper::toEntity)
                 .flatMap(serviceTypeRepository::save)
-                .map(serviceTypeMapper::toDto)
-                .onErrorMap(e -> new ServiceTypeCreationException("error.entity.serviceType.creation"));
+                .map(serviceTypeMapper::toDto);
     }
 
     @Transactional

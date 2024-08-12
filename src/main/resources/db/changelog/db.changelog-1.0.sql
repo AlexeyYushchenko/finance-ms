@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS currency
 (
     id          SERIAL PRIMARY KEY,
-    code        VARCHAR(3) NOT NULL,
+    code        VARCHAR(4) NOT NULL UNIQUE,
     name        VARCHAR(50),
     enabled     BOOLEAN,
 

@@ -1,8 +1,8 @@
 plugins {
 	java
 	war
-	id("org.springframework.boot") version "3.2.5"
-	id("io.spring.dependency-management") version "1.1.4"
+	id("org.springframework.boot") version "3.3.2"
+	id("io.spring.dependency-management") version "1.1.6"
 }
 
 group = "ru.utlc"
@@ -25,34 +25,41 @@ repositories {
 }
 
 dependencies {
-	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+	implementation("org.springframework.boot:spring-boot-starter-security")
+	implementation("org.springframework:spring-r2dbc")
+
+	implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
 	implementation("org.springframework.boot:spring-boot-starter-web")
-	implementation("org.liquibase:liquibase-core")
-	providedRuntime("org.springframework.boot:spring-boot-starter-tomcat")
-	testImplementation("org.springframework.boot:spring-boot-starter-test")
-	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	implementation("org.springframework.boot:spring-boot-starter-web")
-	implementation ("org.springframework.boot:spring-boot-starter-webflux")
+	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
+
+	implementation ("org.springframework.boot:spring-boot-starter-aop")
+	// AspectJ Weaver dependency (optional, but recommended for better performance)
+	implementation ("org.aspectj:aspectjweaver")
+
+	implementation("org.liquibase:liquibase-core")
+
 	implementation("io.github.resilience4j:resilience4j-spring-boot2:1.7.0")
 	implementation("io.github.resilience4j:resilience4j-circuitbreaker:1.7.0")
 	implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
 
-	implementation ("org.springframework.boot:spring-boot-starter-data-r2dbc")
-	implementation ("io.r2dbc:r2dbc-postgresql")
-	implementation ("io.r2dbc:r2dbc-testcontainers")
+	runtimeOnly("org.postgresql:postgresql")
+	runtimeOnly("org.postgresql:r2dbc-postgresql")
+
+	providedRuntime("org.springframework.boot:spring-boot-starter-tomcat")
 
 	developmentOnly("org.springframework.boot:spring-boot-docker-compose")
-	runtimeOnly("org.postgresql:postgresql")
+
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
-	testImplementation("org.projectlombok:lombok:1.18.22")
 
 	implementation("org.mapstruct:mapstruct:1.5.5.Final")
 	annotationProcessor("org.mapstruct:mapstruct-processor:1.5.5.Final")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("io.projectreactor:reactor-test")
 	testImplementation("org.testcontainers:postgresql:1.19.8")
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<JavaCompile> {

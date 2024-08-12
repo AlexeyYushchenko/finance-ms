@@ -1,54 +1,51 @@
 package ru.utlc.financialmanagementservice.model;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Date;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "invoice")
+@Table("invoice")  // R2DBC Table annotation
 public class Invoice extends AuditingEntity<Long> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long id;  // ID generation handled by the database
 
-    @Column(name = "client_id", nullable = false)
+    @Column("client_id")
     private Integer clientId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_type_id")
-    private ServiceType serviceType;
+    // Relationships must be handled manually
+    @Column("service_type_id")
+    private Long serviceTypeId;  // Store as a foreign key reference
 
-    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
+    @Column("total_amount")
     private BigDecimal totalAmount;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "currency_id")
-    private Currency currency;
+    @Column("currency_id")
+    private Long currencyId;  // Store as a foreign key reference
 
-    @Column(name = "issue_date", nullable = false)
-    @Temporal(TemporalType.DATE)
+    @Column("issue_date")
     private LocalDate issueDate;
 
-    @Column(name = "due_date")
-    @Temporal(TemporalType.DATE)
+    @Column("due_date")
     private LocalDate dueDate;
 
-    @Column(name = "commentary", columnDefinition = "TEXT")
+    @Column("commentary")
     private String commentary;
 
-    @Column(name = "shipment_id")
+    @Column("shipment_id")
     private Long shipmentId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "status_id")
-    private InvoiceStatus invoiceStatus;
+    @Column("status_id")
+    private Long statusId;  // Store as a foreign key reference
 }

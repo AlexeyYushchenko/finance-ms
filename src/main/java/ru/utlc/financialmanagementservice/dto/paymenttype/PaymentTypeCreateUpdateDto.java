@@ -14,12 +14,5 @@ public record PaymentTypeCreateUpdateDto(
         @Pattern(regexp = ".*\\S.*", message = "validation.paymentType.name.pattern")
         @Size(min = 2, max = 100, message = "validation.paymentType.name.size")
         String name,
-        String description,
-        Map<String, PaymentTypeLocalization> localizations
-) {
-    public PaymentTypeCreateUpdateDto {
-        if (localizations == null) {
-            localizations = new HashMap<>();
-        }
-    }
-}
+        String description
+) {}

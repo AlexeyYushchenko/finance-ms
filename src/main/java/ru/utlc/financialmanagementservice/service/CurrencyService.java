@@ -49,8 +49,7 @@ public class CurrencyService {
         return Mono.just(dto)
                 .map(currencyMapper::toEntity)
                 .flatMap(currencyRepository::save)
-                .map(currencyMapper::toDto)
-                .onErrorMap(e -> new CurrencyCreationException("error.entity.currency.creation"));
+                .map(currencyMapper::toDto);
     }
 
     @Transactional

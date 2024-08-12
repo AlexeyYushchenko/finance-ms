@@ -1,9 +1,6 @@
 package ru.utlc.financialmanagementservice.dto.invoice;
 
 import ru.utlc.financialmanagementservice.dto.auditinginfo.AuditingInfoDto;
-import ru.utlc.financialmanagementservice.dto.currency.CurrencyReadDto;
-import ru.utlc.financialmanagementservice.dto.invoicestatus.InvoiceStatusReadDto;
-import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeReadDto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,14 +8,14 @@ import java.time.LocalDate;
 public record InvoiceReadDto(
         Long id,
         Integer clientId,
-        ServiceTypeReadDto serviceType,
+        Integer serviceTypeId,
         BigDecimal totalAmount,
-        CurrencyReadDto currency,
+        Integer currencyId,
         LocalDate issueDate,
         LocalDate dueDate,
         String commentary,
         Long shipmentId,
-        InvoiceStatusReadDto invoiceStatus,
+        Integer invoiceStatusId,
         AuditingInfoDto auditingInfoDto
 ) {
 }

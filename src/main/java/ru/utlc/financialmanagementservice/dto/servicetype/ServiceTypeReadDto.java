@@ -9,7 +9,6 @@ public record ServiceTypeReadDto(
         Integer id,
         String name,
         String description,
-        Map<String, ServiceTypeLocalization> localizations,
         AuditingInfoDto auditingInfoDto
 ) {
 }

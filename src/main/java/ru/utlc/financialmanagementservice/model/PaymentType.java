@@ -1,34 +1,31 @@
 package ru.utlc.financialmanagementservice.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-import ru.utlc.financialmanagementservice.localization.PaymentTypeLocalization;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-import java.util.HashMap;
-import java.util.Map;
-
-@EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
+@EqualsAndHashCode(callSuper = true)
 @Builder
-@Table(name = "payment_type")
+@Table("payment_type")
 public class PaymentType extends AuditingEntity<Integer> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "name", unique = true, nullable = false)
+    @Column("name")
     private String name;
 
-    @Column(name = "description")
+    @Column("description")
     private String description;
 
-    @Builder.Default
-    @ElementCollection
-    @CollectionTable(name = "payment_type_localization", joinColumns = @JoinColumn(name = "payment_type_id"))
-    @MapKeyColumn(name = "language_code")
-    private Map<String, PaymentTypeLocalization> localizations = new HashMap<>();
+    // The localizations are handled manually in a separate table and service
+    // You could have a service method to fetch and handle localizations
 }
