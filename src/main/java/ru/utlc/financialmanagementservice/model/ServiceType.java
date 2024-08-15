@@ -15,10 +15,6 @@ public class ServiceType extends AuditingEntity<Integer> {
 
     @Id
     private Integer id;
-
-    @Column("name")
     private String name;
-
-    @Column("description")
     private String description;
 }

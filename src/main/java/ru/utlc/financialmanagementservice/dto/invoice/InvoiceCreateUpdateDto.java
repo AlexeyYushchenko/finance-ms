@@ -32,6 +32,6 @@ public record InvoiceCreateUpdateDto(
         Long shipmentId,
 
         @NotNull(message = "validation.invoice.invoiceStatus.required")
-        Integer invoiceStatusId
+        Integer statusId
 ) {
 }

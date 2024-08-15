@@ -15,7 +15,7 @@ public record InvoiceReadDto(
         LocalDate dueDate,
         String commentary,
         Long shipmentId,
-        Integer invoiceStatusId,
+        Integer statusId,
         AuditingInfoDto auditingInfoDto
 ) {
 }

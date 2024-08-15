@@ -12,7 +12,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeReadDto;
-import ru.utlc.financialmanagementservice.exception.ServiceTypeCreationException;
 import ru.utlc.financialmanagementservice.mapper.ServiceTypeMapper;
 import ru.utlc.financialmanagementservice.repository.ServiceTypeRepository;
 

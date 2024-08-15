@@ -7,7 +7,7 @@ import ru.utlc.financialmanagementservice.dto.invoice.InvoiceCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.invoice.InvoiceReadDto;
 import ru.utlc.financialmanagementservice.model.Invoice;
 
-@Mapper
+@Mapper(uses = {InvoiceStatusMapper.class, ServiceTypeMapper.class, CurrencyMapper.class})
 public interface InvoiceMapper {
 
     @Mapping(target = "auditingInfoDto", source = ".")

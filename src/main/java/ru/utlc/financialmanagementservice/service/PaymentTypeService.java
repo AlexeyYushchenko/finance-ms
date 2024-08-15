@@ -12,7 +12,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeReadDto;
-import ru.utlc.financialmanagementservice.exception.PaymentTypeCreationException;
 import ru.utlc.financialmanagementservice.mapper.PaymentTypeMapper;
 import ru.utlc.financialmanagementservice.repository.PaymentTypeRepository;
 

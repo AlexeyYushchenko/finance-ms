@@ -12,7 +12,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.invoicestatus.InvoiceStatusCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.invoicestatus.InvoiceStatusReadDto;
-import ru.utlc.financialmanagementservice.exception.InvoiceStatusCreationException;
 import ru.utlc.financialmanagementservice.mapper.InvoiceStatusMapper;
 import ru.utlc.financialmanagementservice.repository.InvoiceStatusRepository;
 

@@ -7,7 +7,7 @@ import ru.utlc.financialmanagementservice.dto.currency.CurrencyCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.currency.CurrencyReadDto;
 import ru.utlc.financialmanagementservice.model.Currency;
 
-@Mapper()
+@Mapper
 public interface CurrencyMapper {
 
     @Mapping(target = "auditingInfoDto", source = ".")

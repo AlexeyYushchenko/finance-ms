@@ -12,7 +12,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.currency.CurrencyCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.currency.CurrencyReadDto;
-import ru.utlc.financialmanagementservice.exception.CurrencyCreationException;
 import ru.utlc.financialmanagementservice.mapper.CurrencyMapper;
 import ru.utlc.financialmanagementservice.repository.CurrencyRepository;
 

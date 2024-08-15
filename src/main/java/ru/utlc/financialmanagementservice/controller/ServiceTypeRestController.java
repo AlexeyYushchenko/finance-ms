@@ -12,8 +12,9 @@ import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeCreateUpdat
 import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeReadDto;
 import ru.utlc.financialmanagementservice.response.Response;
 import ru.utlc.financialmanagementservice.service.ServiceTypeService;
-import ru.utlc.financialmanagementservice.util.RequestHandlerUtil;
+import ru.utlc.financialmanagementservice.util.ValidationErrorUtil;
 
+import java.net.URI;
 import java.util.List;
 
 import static ru.utlc.financialmanagementservice.constants.ApiPaths.SERVICE_TYPES;
@@ -41,24 +42,28 @@ public class ServiceTypeRestController {
 
     @PostMapping(consumes = "application/json")
     public Mono<ResponseEntity<Response>> create(@RequestBody @Valid ServiceTypeCreateUpdateDto dto, BindingResult bindingResult) {
-        return RequestHandlerUtil.handleRequest(
-                bindingResult,
-                serviceTypeService::create,
-                serviceTypeReadDto -> RequestHandlerUtil.createdResponse(serviceTypeReadDto, serviceTypeReadDto.id()),
-                dto
-        );
+        if (bindingResult.hasFieldErrors()) {
+            return ValidationErrorUtil.handleValidationErrors(bindingResult);
+        }
+
+        return serviceTypeService.create(dto)
+                .map(serviceTypeReadDto -> {
+                    URI location = URI.create("/serviceTypes/" + serviceTypeReadDto.id());
+                    return ResponseEntity.created(location).body(new Response(serviceTypeReadDto));
+                });
     }
 
     @PutMapping(value = "/{id}", consumes = "application/json")
     public Mono<ResponseEntity<Response>> update(@PathVariable("id") final Integer id,
                                                  @RequestBody @Valid ServiceTypeCreateUpdateDto dto,
                                                  BindingResult bindingResult) {
-        return RequestHandlerUtil.handleRequest(
-                bindingResult,
-                d -> serviceTypeService.update(id, d),
-                RequestHandlerUtil::updatedResponse,
-                dto
-        );
+        if (bindingResult.hasFieldErrors()) {
+            return ValidationErrorUtil.handleValidationErrors(bindingResult);
+        }
+
+        return serviceTypeService.update(id, dto)
+                .map(updatedDto -> new ResponseEntity<>(new Response(updatedDto), HttpStatus.OK))
+                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @DeleteMapping("/{id}")
