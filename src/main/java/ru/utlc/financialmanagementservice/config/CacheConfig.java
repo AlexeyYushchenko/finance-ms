@@ -7,6 +7,13 @@ import org.springframework.context.annotation.Configuration;
 
 import static ru.utlc.financialmanagementservice.constants.CacheNames.*;
 
+/*
+ * Copyright (c) 2024, ООО Ю-ТЛК МОСКВА. All rights reserved.
+ * Licensed under Proprietary License.
+ *
+ * Author: Алексей Ющенко, ООО Ю-ТЛК МОСКВА
+ * Date: 2024-08-19
+ */
 @Configuration
 @EnableCaching
 public class CacheConfig {

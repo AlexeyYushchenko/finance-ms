@@ -10,7 +10,13 @@ import org.springframework.data.relational.core.mapping.Column;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-
+/*
+ * Copyright (c) 2024, ООО Ю-ТЛК МОСКВА. All rights reserved.
+ * Licensed under Proprietary License.
+ *
+ * Author: Алексей Ющенко, ООО Ю-ТЛК МОСКВА
+ * Date: 2024-08-19
+ */
 @Getter
 @Setter
 public abstract class AuditingEntity<T extends Serializable> implements BaseEntity<T> {

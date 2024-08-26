@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeReadDto;
-import ru.utlc.financialmanagementservice.service.PaymentTypeService;
 import ru.utlc.financialmanagementservice.response.Response;
+import ru.utlc.financialmanagementservice.service.PaymentTypeService;
 import ru.utlc.financialmanagementservice.util.ValidationErrorUtil;
 
 import java.net.URI;
@@ -19,6 +19,13 @@ import java.util.List;
 
 import static ru.utlc.financialmanagementservice.constants.ApiPaths.PAYMENT_TYPES;
 
+/*
+ * Copyright (c) 2024, ООО Ю-ТЛК МОСКВА. All rights reserved.
+ * Licensed under Proprietary License.
+ *
+ * Author: Алексей Ющенко, ООО Ю-ТЛК МОСКВА
+ * Date: 2024-08-19
+ */
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -26,6 +33,7 @@ import static ru.utlc.financialmanagementservice.constants.ApiPaths.PAYMENT_TYPE
 public class PaymentTypeRestController {
 
     private final PaymentTypeService paymentTypeService;
+
     @GetMapping
     public Mono<ResponseEntity<List<PaymentTypeReadDto>>> findAll() {
         return paymentTypeService.findAll()

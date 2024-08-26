@@ -19,6 +19,13 @@ import java.util.Objects;
 
 import static ru.utlc.financialmanagementservice.constants.CacheNames.SERVICE_TYPES;
 
+/*
+ * Copyright (c) 2024, ООО Ю-ТЛК МОСКВА. All rights reserved.
+ * Licensed under Proprietary License.
+ *
+ * Author: Алексей Ющенко, ООО Ю-ТЛК МОСКВА
+ * Date: 2024-08-19
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -62,7 +69,8 @@ public class ServiceTypeService {
     }
 
     @Transactional
-    @CacheEvict(value = SERVICE_TYPES, allEntries = true) //todo improve by selectively deleting only the cached entity while updating 'all'.
+    @CacheEvict(value = SERVICE_TYPES, allEntries = true)
+    //todo improve by selectively deleting only the cached entity while updating 'all'.
     public Mono<Boolean> delete(Integer id) {
         return serviceTypeRepository.findById(id)
                 .flatMap(serviceType -> serviceTypeRepository.delete(serviceType)
