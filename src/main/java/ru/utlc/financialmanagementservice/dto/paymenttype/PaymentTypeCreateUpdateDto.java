@@ -10,9 +10,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public record PaymentTypeCreateUpdateDto(
-        @NotNull(message = "validation.paymentType.name.required")
-        @Pattern(regexp = ".*\\S.*", message = "validation.paymentType.name.pattern")
-        @Size(min = 2, max = 100, message = "validation.paymentType.name.size")
+        @NotNull(message = "{validation.paymentType.name.required}")
+        @Pattern(regexp = ".*\\S.*", message = "{validation.paymentType.name.pattern}")
+        @Size(min = 2, max = 100, message = "{validation.paymentType.name.size}")
         String name,
         String description
 ) {}

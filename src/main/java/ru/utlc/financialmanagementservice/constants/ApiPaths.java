@@ -17,4 +17,7 @@ public class ApiPaths {
     public static final String PAYMENT_TYPES = "/api/v1/paymentTypes";
     public static final String PAYMENTS = "/api/v1/payments";
     public static final String SERVICE_TYPES = "/api/v1/serviceTypes";
+    public static final String CLIENT_BALANCES = "/api/v1/clientBalances";
+    public static final String PAYMENT_INVOICES = "/api/v1/paymentInvoices";
+
 }

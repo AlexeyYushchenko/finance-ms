@@ -49,12 +49,7 @@ public class CurrencyRestController {
     }
 
     @PostMapping(consumes = "application/json")
-    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid CurrencyCreateUpdateDto dto,
-                                                 BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid CurrencyCreateUpdateDto dto) {
         return currencyService.create(dto)
                 .map(currencyReadDto -> {
                     URI location = URI.create("/currencies/" + currencyReadDto.id());
@@ -64,15 +59,10 @@ public class CurrencyRestController {
 
     @PutMapping(value = "/{id}", consumes = "application/json")
     public Mono<ResponseEntity<Response>> update(@PathVariable("id") final Integer id,
-                                                 @RequestBody @Valid CurrencyCreateUpdateDto dto,
-                                                 BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+                                                 @RequestBody @Valid CurrencyCreateUpdateDto dto) {
         return currencyService.update(id, dto)
-                .map(updatedDto -> new ResponseEntity<>(new Response(updatedDto), HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                .map(updatedDto -> ResponseEntity.ok(new Response(updatedDto)))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")

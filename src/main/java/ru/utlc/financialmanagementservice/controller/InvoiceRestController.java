@@ -57,96 +57,28 @@ public class InvoiceRestController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-//    @GetMapping
-//    public Mono<ResponseEntity<List<InvoiceEnrichedReadDto>>> findAllEnriched(@RequestParam("language") String language) {
-//        return invoiceService.findAll()
-//                .flatMap(invoice -> Mono.zip(
-//                                        clientService.findClientById(invoice.clientId(), language),
-//                                        serviceTypeService.findById(invoice.serviceTypeId()),
-//                                        currencyService.findById(invoice.currencyId()),
-//                                        invoiceStatusService.findById(invoice.statusId()),
-//                                        Mono.just(invoice)
-//                                )
-//                                .map(tuple -> new InvoiceEnrichedReadDto(
-//                                        invoice.id(),
-//                                        tuple.getT1(),  // ClientReadDto
-//                                        tuple.getT2(),  // ServiceTypeReadDto
-//                                        invoice.totalAmount(),
-//                                        tuple.getT3(),  // CurrencyReadDto
-//                                        invoice.issueDate(),
-//                                        invoice.dueDate(),
-//                                        invoice.commentary(),
-//                                        invoice.shipmentId(),
-//                                        tuple.getT4(),  // InvoiceStatusReadDto
-//                                        tuple.getT4().auditingInfoDto()
-//                                ))
-//                )
-//                .collectList()
-//                .map(ResponseEntity::ok)
-//                .defaultIfEmpty(ResponseEntity.notFound().build());
-//    }
-//
-//
-//    @GetMapping("/{id}")
-//    public Mono<ResponseEntity<InvoiceEnrichedReadDto>> findById(@PathVariable("id") final Long id, @RequestParam("language") String language) {
-//        return invoiceService.findById(id)
-//                .flatMap(invoice -> Mono.zip(
-//                                        clientService.findClientById(invoice.clientId(), language),
-//                                        serviceTypeService.findById(invoice.serviceTypeId()),
-//                                        currencyService.findById(invoice.currencyId()),
-//                                        invoiceStatusService.findById(invoice.statusId()),
-//                                        Mono.just(invoice)
-//                                )
-//                                .map(tuple -> new InvoiceEnrichedReadDto(
-//                                        invoice.id(),
-//                                        tuple.getT1(),  // ClientReadDto
-//                                        tuple.getT2(),  // ServiceTypeReadDto
-//                                        invoice.totalAmount(),
-//                                        tuple.getT3(),  // CurrencyReadDto
-//                                        invoice.issueDate(),
-//                                        invoice.dueDate(),
-//                                        invoice.commentary(),
-//                                        invoice.shipmentId(),
-//                                        tuple.getT4(),  // InvoiceStatusReadDto
-//                                        tuple.getT4().auditingInfoDto()
-//                                ))
-//                )
-//                .map(ResponseEntity::ok)
-//                .defaultIfEmpty(ResponseEntity.notFound().build());
-//    }
-
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid final InvoiceCreateUpdateDto dto,
-                                                 BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid final InvoiceCreateUpdateDto dto) {
         return invoiceService.create(dto)
                 .map(invoiceReadDto -> {
                     final URI location = URI.create("/invoices/" + invoiceReadDto.id());
-                    return ResponseEntity.created(location).body(new Response(invoiceReadDto.id()));
+                    return ResponseEntity.created(location).body(new Response(invoiceReadDto));
                 });
     }
 
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<Response>> update(@PathVariable("id") final Long id,
-                                                 @RequestBody @Valid InvoiceCreateUpdateDto dto,
-                                                 BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+                                                 @RequestBody @Valid InvoiceCreateUpdateDto dto) {
         return invoiceService.update(id, dto)
-                .map(updatedDto -> new ResponseEntity<>(new Response(updatedDto), HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                .map(updatedDto -> ResponseEntity.ok(new Response(updatedDto)))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<Void>> delete(@PathVariable("id") final Long id) {
         return invoiceService.delete(id)
                 .flatMap(deleted -> Boolean.TRUE.equals(deleted)
-                        ? Mono.just(new ResponseEntity<>(HttpStatus.NO_CONTENT))
-                        : Mono.just(new ResponseEntity<>(HttpStatus.NOT_FOUND)));
+                        ? Mono.just(ResponseEntity.noContent().build())
+                        : Mono.just(ResponseEntity.notFound().build()));
     }
 }

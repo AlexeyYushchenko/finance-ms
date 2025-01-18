@@ -49,11 +49,7 @@ public class ServiceTypeRestController {
     }
 
     @PostMapping(consumes = "application/json")
-    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid ServiceTypeCreateUpdateDto dto, BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid ServiceTypeCreateUpdateDto dto) {
         return serviceTypeService.create(dto)
                 .map(serviceTypeReadDto -> {
                     URI location = URI.create("/serviceTypes/" + serviceTypeReadDto.id());
@@ -63,15 +59,10 @@ public class ServiceTypeRestController {
 
     @PutMapping(value = "/{id}", consumes = "application/json")
     public Mono<ResponseEntity<Response>> update(@PathVariable("id") final Integer id,
-                                                 @RequestBody @Valid ServiceTypeCreateUpdateDto dto,
-                                                 BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+                                                 @RequestBody @Valid ServiceTypeCreateUpdateDto dto) {
         return serviceTypeService.update(id, dto)
-                .map(updatedDto -> new ResponseEntity<>(new Response(updatedDto), HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                .map(updatedDto -> ResponseEntity.ok(new Response(updatedDto)))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")

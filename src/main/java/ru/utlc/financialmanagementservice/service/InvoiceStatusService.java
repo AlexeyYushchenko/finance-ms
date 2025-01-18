@@ -12,6 +12,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.invoicestatus.InvoiceStatusCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.invoicestatus.InvoiceStatusReadDto;
+import ru.utlc.financialmanagementservice.exception.InvoiceNotFoundException;
+import ru.utlc.financialmanagementservice.exception.InvoiceStatusNotFoundException;
 import ru.utlc.financialmanagementservice.mapper.InvoiceStatusMapper;
 import ru.utlc.financialmanagementservice.repository.InvoiceStatusRepository;
 
@@ -45,6 +47,7 @@ public class InvoiceStatusService {
     @Cacheable(value = INVOICE_STATUSES, key = "#p0")
     public Mono<InvoiceStatusReadDto> findById(Integer id) {
         return invoiceStatusRepository.findById(id)
+                .switchIfEmpty(Mono.error(new InvoiceStatusNotFoundException("error.invoiceStatus.notFound", id)))
                 .map(invoiceStatusMapper::toDto);
     }
 

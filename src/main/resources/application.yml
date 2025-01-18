@@ -1,1 +1,22 @@
-spring.application.name=financialmanagementservice
+spring:
+  application:
+    name: financialmanagementservice
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    url: jdbc:postgresql://localhost:5437/financial_management
+    user: postgres
+    password: secret
+
+  datasource:
+    url: jdbc:postgresql://localhost:5437/financial_management
+    username: postgres
+    password: secret
+    driver-class-name: org.postgresql.Driver
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5437/financial_management
+    username: postgres
+    password: secret
+
+

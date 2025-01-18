@@ -1,4 +1,4 @@
-package ru.utlc.referencedataservice.integration;
+package ru.utlc.financialmanagementservice.integration;
 
 import org.springframework.boot.test.context.TestConfiguration;
 

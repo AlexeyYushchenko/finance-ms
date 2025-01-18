@@ -2,18 +2,12 @@ package ru.utlc.financialmanagementservice.mapper;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import ru.utlc.financialmanagementservice.dto.payment.PaymentCreateUpdateDto;
-import ru.utlc.financialmanagementservice.dto.payment.PaymentReadDto;
-import ru.utlc.financialmanagementservice.model.Payment;
+import ru.utlc.financialmanagementservice.dto.clientbalance.ClientBalanceReadDto;
+import ru.utlc.financialmanagementservice.model.ClientBalance;
 
 @Mapper()
-public interface PaymentMapper {
-
+public interface ClientBalanceMapper {
     @Mapping(target = "auditingInfoDto", source = ".")
-    PaymentReadDto toDto(Payment payment);
-
-    Payment toEntity(PaymentCreateUpdateDto dto);
-
-    Payment update(@MappingTarget Payment payment, PaymentCreateUpdateDto dto);
+    ClientBalanceReadDto toDto(ClientBalance clientBalance);
 }
+

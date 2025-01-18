@@ -7,7 +7,7 @@ import ru.utlc.financialmanagementservice.dto.payment.PaymentCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.payment.PaymentReadDto;
 import ru.utlc.financialmanagementservice.model.Payment;
 
-@Mapper
+@Mapper()
 public interface PaymentMapper {
 
     @Mapping(target = "auditingInfoDto", source = ".")

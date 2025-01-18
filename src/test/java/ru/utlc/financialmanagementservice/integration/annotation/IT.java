@@ -1,8 +1,9 @@
-package ru.utlc.referencedataservice.integration.annotation;
+package ru.utlc.financialmanagementservice.integration.annotation;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -14,5 +15,6 @@ import java.lang.annotation.Target;
 @ActiveProfiles("test")
 @Transactional
 @SpringBootTest
+@Testcontainers
 public @interface IT {
 }

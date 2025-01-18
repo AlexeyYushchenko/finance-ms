@@ -20,4 +20,9 @@ public record Response(List<String> errorMessages, Object resource) {
     public Response(Object resource) {
         this(null, resource);
     }
+
+    public Response(List<String> errorMessages, Object resource) {
+        this.errorMessages = errorMessages;
+        this.resource=resource;
+    }
 }

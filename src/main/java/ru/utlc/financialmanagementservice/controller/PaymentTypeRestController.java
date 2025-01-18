@@ -49,11 +49,7 @@ public class PaymentTypeRestController {
     }
 
     @PostMapping(consumes = "application/json")
-    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid PaymentTypeCreateUpdateDto dto, BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid PaymentTypeCreateUpdateDto dto) {
         return paymentTypeService.create(dto)
                 .map(paymentTypeReadDto -> {
                     URI location = URI.create("/paymentTypes/" + paymentTypeReadDto.id());
@@ -63,16 +59,12 @@ public class PaymentTypeRestController {
 
     @PutMapping(value = "/{id}", consumes = "application/json")
     public Mono<ResponseEntity<Response>> update(@PathVariable("id") final Integer id,
-                                                 @RequestBody @Valid PaymentTypeCreateUpdateDto dto,
-                                                 BindingResult bindingResult) {
-        if (bindingResult.hasFieldErrors()) {
-            return ValidationErrorUtil.handleValidationErrors(bindingResult);
-        }
-
+                                                 @RequestBody @Valid PaymentTypeCreateUpdateDto dto) {
         return paymentTypeService.update(id, dto)
-                .map(updatedDto -> new ResponseEntity<>(new Response(updatedDto), HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                .map(updatedDto -> ResponseEntity.ok(new Response(updatedDto)))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
+
 
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<Void>> delete(@PathVariable("id") final Integer id) {

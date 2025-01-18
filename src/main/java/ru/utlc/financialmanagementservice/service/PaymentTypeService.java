@@ -12,6 +12,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeReadDto;
+import ru.utlc.financialmanagementservice.exception.InvoiceNotFoundException;
+import ru.utlc.financialmanagementservice.exception.PaymentTypeNotFoundException;
 import ru.utlc.financialmanagementservice.mapper.PaymentTypeMapper;
 import ru.utlc.financialmanagementservice.repository.PaymentTypeRepository;
 
@@ -45,6 +47,7 @@ public class PaymentTypeService {
     @Cacheable(value = PAYMENT_TYPES, key = "#p0")
     public Mono<PaymentTypeReadDto> findById(Integer id) {
         return paymentTypeRepository.findById(id)
+                .switchIfEmpty(Mono.error(new PaymentTypeNotFoundException("error.paymentType.notFound", id)))
                 .map(paymentTypeMapper::toDto);
     }
 

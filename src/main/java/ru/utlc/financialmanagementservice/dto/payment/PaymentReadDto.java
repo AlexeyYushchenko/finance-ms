@@ -1,8 +1,6 @@
 package ru.utlc.financialmanagementservice.dto.payment;
 
 import ru.utlc.financialmanagementservice.dto.auditinginfo.AuditingInfoDto;
-import ru.utlc.financialmanagementservice.dto.currency.CurrencyReadDto;
-import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeReadDto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,12 +8,15 @@ import java.time.LocalDate;
 public record PaymentReadDto(
         Long id,
         Integer clientId,
-        PaymentTypeReadDto paymentType,
+        Integer paymentTypeId,
         BigDecimal amount,
-        CurrencyReadDto currency,
-        LocalDate paymentDate,
-        BigDecimal paymentProcessingFees,
+        BigDecimal processingFees,
         BigDecimal totalAmount,
+        BigDecimal unallocatedAmount,
+        BigDecimal allocatedAmount,
+        Boolean isFullyAllocated,
+        Integer currencyId,
+        LocalDate paymentDate,
         String commentary,
         AuditingInfoDto auditingInfoDto
 ) {

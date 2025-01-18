@@ -10,6 +10,8 @@ public record InvoiceReadDto(
         Integer clientId,
         Integer serviceTypeId,
         BigDecimal totalAmount,
+        BigDecimal outstandingBalance,
+        BigDecimal amountPaid,
         Integer currencyId,
         LocalDate issueDate,
         LocalDate dueDate,

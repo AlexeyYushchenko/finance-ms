@@ -25,41 +25,57 @@ repositories {
 }
 
 dependencies {
+	// Spring Boot Starters
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework:spring-r2dbc")
-
 	implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
+	implementation("org.springframework.boot:spring-boot-starter-aop")
 
-	implementation ("org.springframework.boot:spring-boot-starter-aop")
-	// AspectJ Weaver dependency (optional, but recommended for better performance)
-	implementation ("org.aspectj:aspectjweaver")
+	// AspectJ (only if needed)
+	implementation("org.aspectj:aspectjweaver")
 
+	// Liquibase (consider switching to starter if simpler configuration needed)
 	implementation("org.liquibase:liquibase-core")
+	implementation("org.postgresql:postgresql")
 
-	implementation("io.github.resilience4j:resilience4j-spring-boot2:1.7.0")
-	implementation("io.github.resilience4j:resilience4j-circuitbreaker:1.7.0")
-	implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
+	// Resilience4j (ensure compatibility with Spring Boot 3.x)
+	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0") // Updated version
+	implementation("io.github.resilience4j:resilience4j-circuitbreaker:2.2.0")
+	implementation("io.github.resilience4j:resilience4j-retry:2.2.0")
 
-	runtimeOnly("org.postgresql:postgresql")
+	// R2DBC PostgreSQL
 	runtimeOnly("org.postgresql:r2dbc-postgresql")
 
+	// Tomcat (for WAR deployment)
 	providedRuntime("org.springframework.boot:spring-boot-starter-tomcat")
 
+	// Development tools
 	developmentOnly("org.springframework.boot:spring-boot-docker-compose")
 
+	// R2DBC SPI
+	implementation("io.r2dbc:r2dbc-spi:0.9.0.RELEASE")
+
+	// Lombok
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
+	testImplementation("org.projectlombok:lombok:1.18.22")
 
+	// MapStruct
 	implementation("org.mapstruct:mapstruct:1.5.5.Final")
 	annotationProcessor("org.mapstruct:mapstruct-processor:1.5.5.Final")
 
+	// Testcontainers
+	testImplementation("org.testcontainers:postgresql:1.19.8")
+	testImplementation("org.testcontainers:r2dbc:1.19.8") // Updated version
+	testImplementation("org.testcontainers:testcontainers:1.19.8") // Consistent version
+
+	// Testing frameworks
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("io.projectreactor:reactor-test")
-	testImplementation("org.testcontainers:postgresql:1.19.8")
-	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+	testImplementation("org.testcontainers:junit-jupiter:1.19.8") // Use consistent Testcontainers version
 }
 
 tasks.withType<JavaCompile> {

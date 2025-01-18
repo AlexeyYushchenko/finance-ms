@@ -17,4 +17,6 @@ public class CacheNames {
     public static final String PAYMENT_TYPES = "paymentTypes";
     public static final String PAYMENTS = "payments";
     public static final String SERVICE_TYPES = "serviceTypes";
+    public static final String CLIENT_BALANCES = "clientBalances";
+
 }

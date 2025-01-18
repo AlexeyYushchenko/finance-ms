@@ -5,18 +5,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import ru.utlc.financialmanagementservice.exception.CurrencyCreationException;
-import ru.utlc.financialmanagementservice.exception.ServiceTypeCreationException;
+import org.springframework.web.bind.support.WebExchangeBindException;
+import reactor.core.publisher.Mono;
+import ru.utlc.financialmanagementservice.exception.*;
 import ru.utlc.financialmanagementservice.response.Response;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -36,12 +39,19 @@ public class GlobalExceptionHandler {
 
     private final MessageSource messageSource;
 
+    @ExceptionHandler(WebExchangeBindException.class)
+    public Mono<ResponseEntity<Response>> handleValidationExceptions(WebExchangeBindException ex) {
+        log.error(ex.getMessage());
+        List<String> errorMessages = getLocalizedErrorMessages(ex.getFieldErrors());
+        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new Response(errorMessages, null)));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(BAD_REQUEST)
     public ResponseEntity<Response> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        List<String> errorMessages = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getDefaultMessage())
-                .toList();
+        log.error(ex.getMessage());
+        List<String> errorMessages = getLocalizedErrorMessages(ex.getFieldErrors());
         Response response = new Response(errorMessages, null);
         return ResponseEntity.badRequest().body(response);
     }
@@ -49,9 +59,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BindException.class)
     @ResponseStatus(BAD_REQUEST)
     public ResponseEntity<Response> handleBindException(BindException ex) {
-        List<String> errorMessages = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getDefaultMessage())
-                .toList();
+        log.error(ex.getMessage());
+        List<String> errorMessages = getLocalizedErrorMessages(ex.getFieldErrors());
         Response response = new Response(errorMessages, null);
         return ResponseEntity.badRequest().body(response);
     }
@@ -60,7 +69,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(CONFLICT)
     public ResponseEntity<Response> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
         String errorMessage;
-
+        log.error(ex.getMessage());
         if (isForeignKeyConstraintViolation(ex)) {
             errorMessage = messageSource.getMessage("error.database.foreignKeyConstraintViolation", null, LocaleContextHolder.getLocale());
         } else if (isUniqueConstraintViolation(ex)) {
@@ -73,34 +82,82 @@ public class GlobalExceptionHandler {
     }
 
     private boolean isForeignKeyConstraintViolation(DataIntegrityViolationException ex) {
+        log.error(ex.getMessage());
         return ex.getMessage() != null && ex.getMessage().contains("violates foreign key constraint");
     }
 
     private boolean isUniqueConstraintViolation(DataIntegrityViolationException ex) {
+        log.error(ex.getMessage());
         return ex.getMessage() != null && ex.getMessage().contains("violates unique constraint");
     }
 
     @ExceptionHandler(CurrencyCreationException.class)
     @ResponseStatus(BAD_REQUEST)
     public ResponseEntity<Response> handleEntityCreationException(CurrencyCreationException ex) {
-        String errorMessage = messageSource.getMessage("error.entity.currency.creation", null, LocaleContextHolder.getLocale());
+        log.error(ex.getMessage());
+        String errorMessage = messageSource.getMessage("error.currency.creation", null, LocaleContextHolder.getLocale());
+        return ResponseEntity.status(BAD_REQUEST).body(new Response(errorMessage));
+    }
+
+    @ExceptionHandler(PaymentUpdateException.class)
+    @ResponseStatus(BAD_REQUEST)
+    public ResponseEntity<Response> handleEntityUpdateException(PaymentUpdateException ex) {
+        log.error(ex.getMessage());
+        String errorMessage = messageSource.getMessage("error.payment.update", null, LocaleContextHolder.getLocale());
+        return ResponseEntity.status(BAD_REQUEST).body(new Response(errorMessage));
+    }
+
+    @ExceptionHandler(InvoiceUpdateException.class)
+    @ResponseStatus(BAD_REQUEST)
+    public ResponseEntity<Response> handleEntityUpdateException(InvoiceUpdateException ex) {
+        log.error(ex.getMessage());
+        String errorMessage = messageSource.getMessage("error.invoice.update", null, LocaleContextHolder.getLocale());
         return ResponseEntity.status(BAD_REQUEST).body(new Response(errorMessage));
     }
 
     @ExceptionHandler(ServiceTypeCreationException.class)
     @ResponseStatus(BAD_REQUEST)
     public ResponseEntity<Response> handleEntityCreationException(ServiceTypeCreationException ex) {
-        String errorMessage = messageSource.getMessage("error.entity.serviceType.creation", null, LocaleContextHolder.getLocale());
+        log.error(ex.getMessage());
+        String errorMessage = messageSource.getMessage("error.serviceType.creation", null, LocaleContextHolder.getLocale());
+        return ResponseEntity.status(BAD_REQUEST).body(new Response(errorMessage));
+    }
+
+    @ExceptionHandler(ValidationException.class)
+    @ResponseStatus(BAD_REQUEST)
+    public ResponseEntity<Response> handleValidationException(ValidationException ex) {
+        log.error("Validation error: {}", ex.getMessageKey());
+        String errorMessage = messageSource.getMessage(ex.getMessageKey(), ex.getArgs(), LocaleContextHolder.getLocale());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new Response(errorMessage));
+    }
+
+    @ExceptionHandler(AbstractNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ResponseEntity<Response> handleAllNotFoundExceptions(AbstractNotFoundException ex) {
+        String errorMessage = messageSource.getMessage(ex.getMessage(), ex.getArgs(), LocaleContextHolder.getLocale());
+        log.error(errorMessage);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new Response(errorMessage));
+    }
+
+    @ExceptionHandler(ExchangeRateRetrievalFailedException.class)
+    @ResponseStatus(INTERNAL_SERVER_ERROR)
+    public ResponseEntity<Response> handleExchangeRateNotFoundException(ExchangeRateRetrievalFailedException ex) {
+        String errorMessage = messageSource.getMessage(ex.getMessage(), ex.getArgs(), LocaleContextHolder.getLocale());
+        log.error(errorMessage);
         return ResponseEntity.status(BAD_REQUEST).body(new Response(errorMessage));
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(INTERNAL_SERVER_ERROR)
     public ResponseEntity<Response> handleGeneralException(Exception ex) {
-        System.out.println(ex.getMessage());
-        System.out.println(Arrays.toString(ex.getStackTrace()));
-
+        log.error(ex.getMessage());
         String errorMessage = messageSource.getMessage("error.general", null, LocaleContextHolder.getLocale());
         return ResponseEntity.status(INTERNAL_SERVER_ERROR).body(new Response(errorMessage));
+    }
+
+    private List<String> getLocalizedErrorMessages(List<FieldError> fieldErrors) {
+        return fieldErrors.stream()
+                .map(fieldError -> messageSource.getMessage(fieldError, LocaleContextHolder.getLocale()))
+                .toList();
     }
 }

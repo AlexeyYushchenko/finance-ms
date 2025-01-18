@@ -28,6 +28,7 @@ public class CacheConfig {
                 CURRENCIES,
                 PAYMENTS,
                 PAYMENT_TYPES,
-                SERVICE_TYPES);
+                SERVICE_TYPES,
+                CLIENT_BALANCES);
     }
 }
