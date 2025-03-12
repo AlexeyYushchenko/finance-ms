@@ -9,3 +9,9 @@
 #logging:
 #  level:
 #    liquibase: DEBUG
+
+spring:
+  r2dbc:
+    pool:
+      initial-size: 10
+      max-size: 20
