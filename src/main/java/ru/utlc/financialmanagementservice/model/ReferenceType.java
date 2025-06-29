@@ -2,8 +2,8 @@ package ru.utlc.financialmanagementservice.model;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
+
 /*
  * Copyright (c) 2024, ООО Ю-ТЛК МОСКВА. All rights reserved.
  * Licensed under Proprietary License.
@@ -16,11 +16,10 @@ import org.springframework.data.relational.core.mapping.Table;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @Builder
-@Table("payment_type")
-public class PaymentType extends AuditingEntity<Integer> {
+@Table("reference_type")
+public class ReferenceType extends AuditingEntity<Integer> {
 
     @Id
     private Integer id;
     private String name;
-    private String description;
 }

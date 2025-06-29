@@ -35,7 +35,6 @@ public class TransactionLedgerService {
     private final LedgerEntryMapper ledgerEntryMapper;
 
     private final ExchangeRateService exchangeRateService;
-    private final CurrencyRateService currencyRateService;
 
     private final ReactiveTransactionManager txManager;
     private static final int REFTYPE_ALLOCATION = 3;
@@ -152,28 +151,24 @@ public class TransactionLedgerService {
      * ------------------------------------------------
      */
 
+    public Flux<LedgerEntryReadDto> findAllocationsForPaymentInvoice(Long paymentId, Long invoiceId) {
+        return ledgerEntryRepository.findAllByPaymentIdAndInvoiceIdAndReferenceTypeId(paymentId, invoiceId, REFTYPE_ALLOCATION).map(ledgerEntryMapper::toReadDto);
+    }
+
+
     private Mono<BigDecimal> computeBaseAmount(Integer currencyId, BigDecimal amount, LocalDate date) {
         if (currencyId.equals(RUB_CURRENCY_ID)) {
             return Mono.just(amount);
         }
         return exchangeRateService.getExchangeRate(currencyId, RUB_CURRENCY_ID, date)
                 .switchIfEmpty(
-                        currencyRateService.fetchAndSaveRates(date)
+                        exchangeRateService.fetchAndSaveRates(date)
                                 .then(exchangeRateService.getExchangeRate(currencyId, RUB_CURRENCY_ID, date))
                 )
                 .map(rate -> amount.multiply(rate).setScale(2, RoundingMode.HALF_UP));
     }
 
-    public Mono<Void> writeAllocationRow(Long partnerId,
-                                         Integer currencyId,
-                                         BigDecimal amount,
-                                         Long paymentId,
-                                         Long invoiceId,
-                                         LocalDate date) {
-        // reference_type_id=3 => ALLOCATION
-        LedgerEntryCreateUpdateDto dto = new LedgerEntryCreateUpdateDto(
-                partnerId, currencyId, amount, REFTYPE_ALLOCATION, paymentId, invoiceId, date
-        );
+    public Mono<Void> writeAllocationRow(LedgerEntryCreateUpdateDto dto) {
         return createLedgerEntry(dto).then();
     }
 }

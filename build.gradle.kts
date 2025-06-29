@@ -22,6 +22,7 @@ configurations {
 
 repositories {
 	mavenCentral()
+	mavenLocal()
 }
 
 dependencies {
@@ -42,7 +43,7 @@ dependencies {
 	implementation("org.postgresql:postgresql")
 
 	// Resilience4j (ensure compatibility with Spring Boot 3.x)
-	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0") // Updated version
+	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
 	implementation("io.github.resilience4j:resilience4j-circuitbreaker:2.2.0")
 	implementation("io.github.resilience4j:resilience4j-retry:2.2.0")
 
@@ -61,7 +62,10 @@ dependencies {
 	// Lombok
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
-	testImplementation("org.projectlombok:lombok:1.18.22")
+
+	testImplementation("org.projectlombok:lombok")
+	testCompileOnly ("org.projectlombok:lombok")
+	testAnnotationProcessor("org.projectlombok:lombok")
 
 	// MapStruct
 	implementation("org.mapstruct:mapstruct:1.5.5.Final")
@@ -76,6 +80,8 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("io.projectreactor:reactor-test")
 	testImplementation("org.testcontainers:junit-jupiter:1.19.8") // Use consistent Testcontainers version
+
+	implementation("ru.utlc.partner:partner-api:1.0.0")
 }
 
 tasks.withType<JavaCompile> {

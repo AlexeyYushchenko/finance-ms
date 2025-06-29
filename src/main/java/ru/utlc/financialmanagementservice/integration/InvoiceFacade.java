@@ -4,7 +4,7 @@
 //import lombok.extern.slf4j.Slf4j;
 //import org.springframework.stereotype.Component;
 //import reactor.core.publisher.Mono;
-//import ru.utlc.financialmanagementservice.dto.clientId.ClientReadDto;
+//import ru.utlc.financialmanagementservice.dto.partnerId.ClientReadDto;
 //import ru.utlc.financialmanagementservice.mapper.ClientMapper;
 //import ru.utlc.financialmanagementservice.model.Invoice;
 //import ru.utlc.financialmanagementservice.repository.CurrencyRepository;
@@ -25,18 +25,18 @@
 //    private final ClientMapper clientMapper;
 //
 //    public Invoice enrichInvoice(Invoice invoice) {
-//        // Fetch clientId details asynchronously
+//        // Fetch partnerId details asynchronously
 //        Mono<ClientReadDto> clientMono = clientService.findClientById(invoice.getClient().getId());
 //
 //        try {
 //
-//            clientMono.subscribe(clientId -> invoice.setClient(clientId));
+//            clientMono.subscribe(partnerId -> invoice.setClient(partnerId));
 //
 //            ClientReadDto clientDto = clientMono.toFuture().get();  // Blocking call for simplicity, use async handling in real applications
 //            invoice.setClient(clientMapper.toEntity(clientDto));
 //        } catch (InterruptedException | ExecutionException e) {
-//            log.error("Error fetching clientId details", e);
-//            // Handle error, e.g., set clientId to null or a default value
+//            log.error("Error fetching partnerId details", e);
+//            // Handle error, e.g., set partnerId to null or a default value
 //        }
 //
 //        var invoiceStatus = Optional.ofNullable(invoice.getInvoiceStatus().getId())

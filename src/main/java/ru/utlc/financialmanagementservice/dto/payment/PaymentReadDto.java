@@ -7,7 +7,8 @@ import java.time.LocalDate;
 
 public record PaymentReadDto(
         Long id,
-        Integer clientId,
+        Integer paymentStatusId,
+        Long partnerId,
         Integer paymentTypeId,
         BigDecimal amount,
         BigDecimal processingFees,

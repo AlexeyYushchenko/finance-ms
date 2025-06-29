@@ -7,12 +7,12 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.ReactiveTransactionManager;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeReadDto;
-import ru.utlc.financialmanagementservice.exception.InvoiceNotFoundException;
 import ru.utlc.financialmanagementservice.exception.PaymentTypeNotFoundException;
 import ru.utlc.financialmanagementservice.mapper.PaymentTypeMapper;
 import ru.utlc.financialmanagementservice.repository.PaymentTypeRepository;
@@ -31,11 +31,16 @@ import static ru.utlc.financialmanagementservice.constants.CacheNames.PAYMENT_TY
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class PaymentTypeService {
     private final PaymentTypeRepository paymentTypeRepository;
     private final PaymentTypeMapper paymentTypeMapper;
     private final CacheManager cacheManager;
+    private final ReactiveTransactionManager transactionManager;
+
+    // Create a TransactionalOperator for reactive transaction management
+    private TransactionalOperator transactionalOperator() {
+        return TransactionalOperator.create(transactionManager);
+    }
 
     @Cacheable(value = PAYMENT_TYPES, key = "'all'")
     public Flux<PaymentTypeReadDto> findAll() {
@@ -47,37 +52,39 @@ public class PaymentTypeService {
     @Cacheable(value = PAYMENT_TYPES, key = "#p0")
     public Mono<PaymentTypeReadDto> findById(Integer id) {
         return paymentTypeRepository.findById(id)
-                .switchIfEmpty(Mono.error(new PaymentTypeNotFoundException("error.paymentType.notFound", id)))
+                .switchIfEmpty(Mono.error(new PaymentTypeNotFoundException(id)))
                 .map(paymentTypeMapper::toDto);
     }
 
-    @Transactional
     @CacheEvict(value = PAYMENT_TYPES, key = "'all'")
     @CachePut(value = PAYMENT_TYPES, key = "#result.id")
     public Mono<PaymentTypeReadDto> create(PaymentTypeCreateUpdateDto dto) {
         return Mono.just(dto)
                 .map(paymentTypeMapper::toEntity)
                 .flatMap(paymentTypeRepository::save)
-                .map(paymentTypeMapper::toDto);
+                .map(paymentTypeMapper::toDto)
+                .as(transactionalOperator()::transactional); // Apply reactive transaction management
     }
 
-    @Transactional
     @CacheEvict(value = PAYMENT_TYPES, key = "'all'")
     @CachePut(value = PAYMENT_TYPES, key = "#result.id")
     public Mono<PaymentTypeReadDto> update(Integer id, PaymentTypeCreateUpdateDto dto) {
         return paymentTypeRepository.findById(id)
-                .flatMap(entity -> Mono.just(paymentTypeMapper.update(entity, dto)))
-                .flatMap(paymentTypeRepository::save)
-                .map(paymentTypeMapper::toDto);
+                .switchIfEmpty(Mono.error(new PaymentTypeNotFoundException(id)))
+                .flatMap(existingEntity -> {
+                    paymentTypeMapper.update(existingEntity, dto);
+                    return paymentTypeRepository.save(existingEntity);
+                })
+                .map(paymentTypeMapper::toDto)
+                .as(transactionalOperator()::transactional); // Apply reactive transaction management
     }
 
-    @Transactional
     @CacheEvict(value = PAYMENT_TYPES, allEntries = true)
-    //todo improve by selectively deleting only the cached entity while updating 'all'.
     public Mono<Boolean> delete(Integer id) {
         return paymentTypeRepository.findById(id)
-                .flatMap(paymentType -> paymentTypeRepository.delete(paymentType)
+                .flatMap(existingEntity -> paymentTypeRepository.delete(existingEntity)
                         .thenReturn(true))
-                .defaultIfEmpty(false);
+                .defaultIfEmpty(false)
+                .as(transactionalOperator()::transactional); // Apply reactive transaction management
     }
 }

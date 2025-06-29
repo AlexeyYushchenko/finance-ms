@@ -12,11 +12,15 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public class CacheNames {
     public static final String INVOICE_STATUSES = "invoiceStatuses";
+    public static final String PAYMENT_STATUSES = "paymentStatuses";
     public static final String INVOICES = "invoices";
     public static final String CURRENCIES = "currencies";
     public static final String PAYMENT_TYPES = "paymentTypes";
     public static final String PAYMENTS = "payments";
     public static final String SERVICE_TYPES = "serviceTypes";
+    public static final String REFERENCE_TYPES = "referenceTypes";
+    public static final String PARTNER_TYPES = "partnerTypes";
+    public static final String PARTNERS = "partners";
     public static final String CLIENT_BALANCES = "clientBalances";
 
 }

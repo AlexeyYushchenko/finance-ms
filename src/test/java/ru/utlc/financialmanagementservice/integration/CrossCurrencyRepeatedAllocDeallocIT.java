@@ -1,16 +1,18 @@
 package ru.utlc.financialmanagementservice.integration;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.context.support.DependencyInjectionTestExecutionListener;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -19,6 +21,9 @@ import ru.utlc.financialmanagementservice.dto.invoice.InvoiceCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.invoice.InvoiceReadDto;
 import ru.utlc.financialmanagementservice.dto.payment.PaymentCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.payment.PaymentReadDto;
+import ru.utlc.financialmanagementservice.integration.PartnerService;
+import ru.utlc.financialmanagementservice.model.InvoiceDirection;
+import ru.utlc.partner.api.dto.PartnerDto;
 import ru.utlc.financialmanagementservice.service.AllocationService;
 import ru.utlc.financialmanagementservice.service.ClientBalanceService;
 import ru.utlc.financialmanagementservice.service.InvoiceService;
@@ -26,25 +31,19 @@ import ru.utlc.financialmanagementservice.service.PaymentService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-/**
- * This test checks repeated cross-currency allocation/deallocation
- * to ensure the final client balance remains unchanged.
- */
 @Slf4j
-@TestExecutionListeners(
-    listeners = {
-        DependencyInjectionTestExecutionListener.class
-    },
-    mergeMode = TestExecutionListeners.MergeMode.REPLACE_DEFAULTS
-)
 @ExtendWith(SpringExtension.class)
 @Testcontainers
 @ActiveProfiles("test")
 @SpringBootTest
+@RequiredArgsConstructor
+@DirtiesContext
 public class CrossCurrencyRepeatedAllocDeallocIT extends IntegrationTestBase {
 
     @Autowired
@@ -62,6 +61,9 @@ public class CrossCurrencyRepeatedAllocDeallocIT extends IntegrationTestBase {
     @Autowired
     private ClientBalanceService clientBalanceService;
 
+    @MockBean
+    private PartnerService partnerService;
+
     private static final long PARTNER_ID = 1L;
     private static final int RUB = 1;
     private static final int USD = 2;
@@ -71,36 +73,30 @@ public class CrossCurrencyRepeatedAllocDeallocIT extends IntegrationTestBase {
     private static final int INVOICE_STATUS_ID = 1;
 
     @BeforeEach
-    void resetDatabase() {
-        // Truncate Payment, Invoice, Partner, etc.
-        databaseClient.sql("TRUNCATE TABLE payment RESTART IDENTITY CASCADE")
-                .fetch()
-                .rowsUpdated()
-                .block();
+    void resetDatabaseAndStubPartner() {
+        // Truncate FMS tables
+        databaseClient.sql("TRUNCATE TABLE transaction_ledger RESTART IDENTITY CASCADE").fetch().rowsUpdated().block();
+        databaseClient.sql("TRUNCATE TABLE payment RESTART IDENTITY CASCADE").fetch().rowsUpdated().block();
+        databaseClient.sql("TRUNCATE TABLE invoice RESTART IDENTITY CASCADE").fetch().rowsUpdated().block();
 
-        databaseClient.sql("TRUNCATE TABLE invoice RESTART IDENTITY CASCADE")
-                .fetch()
-                .rowsUpdated()
-                .block();
-
-        databaseClient.sql("TRUNCATE TABLE partner RESTART IDENTITY CASCADE")
-                .fetch()
-                .rowsUpdated()
-                .block();
-
-        // Insert partner #1
-        databaseClient.sql("""
-           INSERT INTO partner (id, partner_type_id, external_id, created_at, modified_at, created_by, modified_by)
-           VALUES (1, 1, 1001, now(), now(), 'test', 'test')
-        """)
-                .fetch()
-                .rowsUpdated()
-                .block();
+        // Stub PartnerService
+        PartnerDto stubPartner = new PartnerDto(
+                (int) PARTNER_ID,
+                "Test Partner",
+                "Test Partner Inc.",
+                100,
+                "Test Address",
+                List.of(),
+                null,
+                null
+        );
+        Mockito.when(partnerService.findById(eq(PARTNER_ID)))
+                .thenReturn(Mono.just(stubPartner));
     }
 
     @Test
     void testRepeatAllocateDeallocateRubToUsd_100Times_ClientBalanceUnchanged() {
-        // 1) Create Payment in RUB => leftover=100 (enough to allocate 1 rub 100 times)
+        // Arrange: create RUB payment and USD invoice
         PaymentCreateUpdateDto paymentDto = new PaymentCreateUpdateDto(
                 PAYMENT_STATUS_COMPLETED,
                 PARTNER_ID,
@@ -112,15 +108,14 @@ public class CrossCurrencyRepeatedAllocDeallocIT extends IntegrationTestBase {
                 "Test Payment in RUB"
         );
         PaymentReadDto paymentRub = paymentService.create(paymentDto).block();
-        assertNotNull(paymentRub, "Payment creation must succeed");
-        assertEquals(0, BigDecimal.valueOf(100).compareTo(paymentRub.unallocatedAmount()),
-                "Payment leftover should be 100 rub initially");
+        assertNotNull(paymentRub);
+        assertEquals(0, BigDecimal.valueOf(100).compareTo(paymentRub.unallocatedAmount()));
 
-        // 2) Create Invoice in USD => large total so we don't max out
         InvoiceCreateUpdateDto invoiceDto = new InvoiceCreateUpdateDto(
+                InvoiceDirection.RECEIVABLE,
                 PARTNER_ID,
                 SERVICE_TYPE_ID,
-                BigDecimal.valueOf(1000),  // plenty big total
+                BigDecimal.valueOf(1000),
                 LocalDate.now(),
                 LocalDate.now().plusDays(30),
                 "Test Invoice in USD",
@@ -128,67 +123,48 @@ public class CrossCurrencyRepeatedAllocDeallocIT extends IntegrationTestBase {
                 9999L,
                 INVOICE_STATUS_ID
         );
+
         InvoiceReadDto invoiceUsd = invoiceService.create(invoiceDto).block();
-        assertNotNull(invoiceUsd, "Invoice creation must succeed");
+        assertNotNull(invoiceUsd);
 
-        // 3) Check initial client balance in rub
-        Mono<ClientBalanceReportDto> initialBalanceMono = clientBalanceService
-                .getClientBalance(PARTNER_ID, LocalDate.now());
-
-        // 4) Allocate 1 rub 100 times in a chain, then deallocate 1 rub 100 times,
-        //    then get final client balance, then compare.
+        // Act & Assert: repeat allocate/deallocate then compare balances
+        Mono<ClientBalanceReportDto> initial = clientBalanceService.getClientBalance(PARTNER_ID, LocalDate.now());
         StepVerifier.create(
-            initialBalanceMono.flatMap(initialReport -> {
-                BigDecimal initialLeftoverRub = initialReport.totalLeftoverRub();
-                BigDecimal initialOutstandingRub = initialReport.totalOutstandingRub();
+                        initial.flatMap(initReport -> {
+                            BigDecimal initLeft = initReport.totalLeftoverRub();
+                            BigDecimal initOut  = initReport.totalOutstandingRub();
 
-                // Build a Mono pipeline that runs all allocations, then all deallocations, then checks final balance
-                Mono<Void> allocations = Mono.empty();
-                for (int i = 0; i < 100; i++) {
-                    final int idx = i;
-                    allocations = allocations.then(
-                       allocationService.allocatePaymentToInvoice(
-                           paymentRub.id(),
-                           invoiceUsd.id(),
-                           BigDecimal.ONE // 1 rub each time
-                       )
-                    ).doOnSuccess(v -> log.info("Allocated #{} of 1 rub -> USD", idx+1));
-                }
+                            Mono<Void> allocateSteps = Mono.empty();
+                            for (int i = 0; i < 100; i++) {
+                                allocateSteps = allocateSteps.then(
+                                        allocationService.allocatePaymentToInvoice(
+                                                paymentRub.id(), invoiceUsd.id(), BigDecimal.ONE
+                                        )
+                                );
+                            }
+                            Mono<Void> deallocateSteps = Mono.empty();
+                            for (int i = 0; i < 100; i++) {
+                                deallocateSteps = deallocateSteps.then(
+                                        allocationService.deallocatePaymentFromInvoice(
+                                                paymentRub.id(), invoiceUsd.id(), BigDecimal.ONE
+                                        )
+                                );
+                            }
 
-                Mono<Void> deallocations = Mono.empty();
-                for (int i = 0; i < 100; i++) {
-                    final int idx = i;
-                    deallocations = deallocations.then(
-                        allocationService.deallocatePaymentFromInvoice(
-                            paymentRub.id(), 
-                            invoiceUsd.id(), 
-                            BigDecimal.ONE
-                        )
-                    ).doOnSuccess(v -> log.info("Deallocated #{} of 1 rub -> USD", idx+1));
-                }
+                            return allocateSteps
+                                    .then(deallocateSteps)
+                                    .then(clientBalanceService.getClientBalance(PARTNER_ID, LocalDate.now()))
+                                    .map(finalReport -> {
+                                        BigDecimal finalLeft = finalReport.totalLeftoverRub();
+                                        BigDecimal finalOut  = finalReport.totalOutstandingRub();
 
-                // Combine it all: allocations -> deallocations -> final check
-                return allocations
-                    .then(deallocations)
-                    .then(clientBalanceService.getClientBalance(PARTNER_ID, LocalDate.now()))
-                    .map(finalReport -> {
-                        // 5) Compare final leftover/outstanding to initial
-                        BigDecimal finalLeftoverRub = finalReport.totalLeftoverRub();
-                        BigDecimal finalOutstandingRub = finalReport.totalOutstandingRub();
-
-                        log.info("Initial leftover={}  final leftover={}", initialLeftoverRub, finalLeftoverRub);
-                        log.info("Initial outstanding={}  final outstanding={}", initialOutstandingRub, finalOutstandingRub);
-
-                        // We expect the same leftover + same outstanding if the net effect was zero
-                        assertEquals(0, initialLeftoverRub.compareTo(finalLeftoverRub),
-                                "Leftover in rub should remain the same after repeated alloc/dealloc");
-                        assertEquals(0, initialOutstandingRub.compareTo(finalOutstandingRub),
-                                "Outstanding in rub should remain the same after repeated alloc/dealloc");
-
-                        return finalReport;
-                    });
-            })
-        ).expectNextCount(1)
-         .verifyComplete();
+                                        assertEquals(0, initLeft.compareTo(finalLeft), "Leftover should be unchanged");
+                                        assertEquals(0, initOut.compareTo(finalOut), "Outstanding should be unchanged");
+                                        return finalReport;
+                                    });
+                        })
+                )
+                .expectNextCount(1)
+                .verifyComplete();
     }
 }

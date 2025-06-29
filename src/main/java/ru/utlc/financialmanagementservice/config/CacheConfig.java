@@ -25,8 +25,11 @@ public class CacheConfig {
         return new ConcurrentMapCacheManager(
                 INVOICES,
                 INVOICE_STATUSES,
+                PAYMENT_STATUSES,
                 CURRENCIES,
                 PAYMENTS,
+                PARTNERS,
+                PARTNER_TYPES,
                 PAYMENT_TYPES,
                 SERVICE_TYPES,
                 CLIENT_BALANCES);

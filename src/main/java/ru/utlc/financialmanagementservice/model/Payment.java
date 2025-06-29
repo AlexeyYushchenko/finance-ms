@@ -3,7 +3,6 @@ package ru.utlc.financialmanagementservice.model;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -27,7 +26,8 @@ public class Payment extends AuditingEntity<Long> {
 
     @Id
     private Long id;
-    private Integer clientId;
+    private Integer paymentStatusId;
+    private Long partnerId;
     private LocalDate paymentDate;
     private Integer paymentTypeId;
     private Integer currencyId;
@@ -35,11 +35,8 @@ public class Payment extends AuditingEntity<Long> {
     private BigDecimal processingFees;
     private BigDecimal totalAmount;
     private BigDecimal unallocatedAmount;
-    @Transient private BigDecimal allocatedAmount;
-    @Transient private Boolean isFullyAllocated;
     private String commentary;
-    @Version
-    private Long version;
+    @Version private Long version;
 
     public Payment calculateTotalAmount() {
         if (processingFees != null) {
@@ -50,8 +47,18 @@ public class Payment extends AuditingEntity<Long> {
         return this;
     }
 
-    public Payment(Integer clientId, Integer paymentTypeId, BigDecimal amount, Integer currencyId, LocalDate paymentDate, BigDecimal processingFees, String commentary) {
-        this.clientId = clientId;
+    public BigDecimal getAllocatedAmount() {
+        return totalAmount.subtract(unallocatedAmount != null ? unallocatedAmount : BigDecimal.ZERO);
+    }
+
+    public Boolean isFullyAllocated() {
+        return unallocatedAmount != null
+                && unallocatedAmount.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    public Payment(Integer paymentStatusId, Long partnerId, Integer paymentTypeId, BigDecimal amount, Integer currencyId, LocalDate paymentDate, BigDecimal processingFees, String commentary) {
+        this.paymentStatusId = paymentStatusId;
+        this.partnerId = partnerId;
         this.paymentTypeId = paymentTypeId;
         this.amount = amount;
         this.currencyId = currencyId;

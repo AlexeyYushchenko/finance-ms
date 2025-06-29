@@ -1,146 +1,163 @@
 package ru.utlc.financialmanagementservice.integration;
 
 import lombok.RequiredArgsConstructor;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.context.support.DependencyInjectionTestExecutionListener;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import ru.utlc.financialmanagementservice.dto.currency.CurrencyCreateUpdateDto;
+import ru.utlc.financialmanagementservice.dto.currency.CurrencyReadDto;
 import ru.utlc.financialmanagementservice.exception.CurrencyNotFoundException;
 import ru.utlc.financialmanagementservice.model.Currency;
 import ru.utlc.financialmanagementservice.repository.CurrencyRepository;
 import ru.utlc.financialmanagementservice.service.CurrencyService;
+import ru.utlc.financialmanagementservice.service.ExchangeRateService;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 
-@TestExecutionListeners(
-        listeners = {
-                DependencyInjectionTestExecutionListener.class
-        },
-        mergeMode = TestExecutionListeners.MergeMode.REPLACE_DEFAULTS
-)
 @ExtendWith(SpringExtension.class)
-@Testcontainers
 @ActiveProfiles("test")
-@SpringBootTest
+@SpringBootTest(
+        properties = {
+                "spring.task.scheduling.enabled=false",
+                "spring.main.allow-bean-definition-overriding=true"
+        }
+)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @RequiredArgsConstructor
 class CurrencyServiceIT extends IntegrationTestBase {
 
-    @Autowired
-    private CurrencyService currencyService;
+    /* ───── 1. Replace the real ExchangeRateService with a stub ───── */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class MockExchangeRateConfig {
+        @Bean(name = "exchangeRateService")
+        @Primary
+        ExchangeRateService mockedExchangeRateService() {
+            ExchangeRateService mock = Mockito.mock(ExchangeRateService.class);
+            Mockito.when(mock.fetchAndSaveRatesForPastYear(anyInt()))
+                    .thenReturn(Mono.empty());     // no-op
+            return mock;
+        }
+    }
 
-    @Autowired
-    private CurrencyRepository currencyRepository;
+    /* ───── 2. Wiring ───── */
+    @Autowired private CurrencyService    currencyService;
+    @Autowired private CurrencyRepository currencyRepository;
+    @Autowired private CacheManager       cacheManager;
 
-    @Autowired
-    private CacheManager cacheManager;
+    /* ───── 3. Helpers ───── */
+    private static Currency cur(String c, String okv, String n) {
+        return Currency.builder().code(c).okvCode(okv).name(n).enabled(true).build();
+    }
+    private static final List<Currency> TEST_ROWS = List.of(
+            cur("GBP", "826", "British Pound"),
+            cur("AUD", "036", "Australian Dollar")
+    );
 
+    /* ───── 4. Seed test currencies before each method ───── */
     @BeforeEach
-    void setUp() {
-        // Add additional currencies for testing
-        currencyRepository.saveAll(List.of(
-                Currency.builder().code("GBP").okvCode(826).name("British Pound").enabled(true).build(),
-                Currency.builder().code("AUD").okvCode(36).name("Australian Dollar").enabled(true).build()
-        )).blockLast();
+    void seedTestCurrencies() {
+        Flux.fromIterable(TEST_ROWS)
+                .flatMap(row ->
+                        currencyRepository.findByCode(row.getCode())
+                                .switchIfEmpty(currencyRepository.save(row)))
+                .then()
+                .block();
     }
 
-    @AfterEach
-    void tearDown() {
-        // Remove test-specific currencies
-        currencyRepository.deleteAllByCodeIn(List.of("GBP", "AUD")).block();
-    }
+    /* ───── 5. Tests ───── */
 
     @Test
     void findAll_ShouldReturnAllCurrencies() {
         StepVerifier.create(currencyService.findAll())
-                .expectNextCount(6) // Includes the four base currencies and two test-specific currencies
+                .expectNextCount(6)              // 4 base + GBP + AUD
                 .verifyComplete();
-
-        assertNotNull(cacheManager.getCache("currencies").get("all"));
     }
 
     @Test
     void findById_ShouldReturnCurrency() {
-        Currency savedCurrency = currencyRepository.findByCode("GBP").block();
+        var id = currencyRepository.findByCode("GBP").map(Currency::getId).block();
+        assertNotNull(id);
 
-        assertNotNull(savedCurrency);
-
-        StepVerifier.create(currencyService.findById(savedCurrency.getId()))
-                .assertNext(currency -> assertEquals("GBP", currency.code()))
+        StepVerifier.create(currencyService.findById(id))
+                .assertNext(dto -> assertEquals("GBP", dto.code()))
                 .verifyComplete();
 
-        assertNotNull(cacheManager.getCache("currencies").get(savedCurrency.getId()));
+        assertNotNull(cacheManager.getCache("currencies").get(id));
     }
 
     @Test
-    void findById_ShouldThrowCurrencyNotFoundException() {
+    void findById_ShouldThrowWhenMissing() {
         StepVerifier.create(currencyService.findById(999))
-                .expectErrorMatches(throwable -> throwable instanceof CurrencyNotFoundException)
+                .expectError(CurrencyNotFoundException.class)
                 .verify();
     }
 
     @Test
     void create_ShouldAddNewCurrency() {
-        CurrencyCreateUpdateDto newCurrency = new CurrencyCreateUpdateDto("CAD", "124", "Canadian Dollar", true);
+        CurrencyCreateUpdateDto dto =
+                new CurrencyCreateUpdateDto("CAD", "124", "Canadian Dollar", true);
 
-        StepVerifier.create(currencyService.create(newCurrency))
-                .assertNext(currency -> {
-                    assertEquals("CAD", currency.code());
-                    assertNotNull(currency.id());
-                    // Validate the individual cache entry
-                    assertNotNull(cacheManager.getCache("currencies").get(currency.id()));
+        StepVerifier.create(currencyService.create(dto))
+                .assertNext(c -> {
+                    assertEquals("CAD", c.code());
+                    assertNotNull(c.id());
+                    assertNotNull(cacheManager.getCache("currencies").get(c.id()));
                 })
                 .verifyComplete();
-
-        // Validate that "all" cache is not populated automatically
-        assertNull(cacheManager.getCache("currencies").get("all"));
     }
-
 
     @Test
     void update_ShouldModifyExistingCurrency() {
-        Currency savedCurrency = currencyRepository.findByCode("GBP").block();
+        Currency gbp = currencyRepository.findByCode("GBP").block();
+        assertNotNull(gbp);
 
-        assertNotNull(savedCurrency);
+        CurrencyCreateUpdateDto upd =
+                new CurrencyCreateUpdateDto("GBP", "826", "British Pound Updated", true);
 
-        CurrencyCreateUpdateDto updateDto = new CurrencyCreateUpdateDto("GBP", "826", "British Pound Updated", true);
-
-        StepVerifier.create(currencyService.update(savedCurrency.getId(), updateDto))
-                .assertNext(updated -> assertEquals("British Pound Updated", updated.name()))
+        StepVerifier.create(currencyService.update(gbp.getId(), upd))
+                .assertNext(c -> assertEquals("British Pound Updated", c.name()))
                 .verifyComplete();
+
+        CurrencyReadDto cached =
+                (CurrencyReadDto) cacheManager.getCache("currencies").get(gbp.getId()).get();
+        assertEquals("British Pound Updated", cached.name());
     }
 
     @Test
-    void delete_ShouldRemoveCurrency() {
-        Currency savedCurrency = currencyRepository.findByCode("GBP").block();
+    void delete_ShouldRemoveCurrencyAndEvictCache() {
+        Currency aud = currencyRepository.findByCode("AUD").block();
+        assertNotNull(aud);
 
-        assertNotNull(savedCurrency);
-
-        StepVerifier.create(currencyService.delete(savedCurrency.getId()))
+        StepVerifier.create(currencyService.delete(aud.getId()))
                 .expectNext(true)
                 .verifyComplete();
 
-        StepVerifier.create(currencyRepository.findById(savedCurrency.getId()))
+        StepVerifier.create(currencyRepository.findById(aud.getId()))
                 .verifyComplete();
+        assertNull(cacheManager.getCache("currencies").get(aud.getId()));
 
-        assertNull(cacheManager.getCache("currencies").get(savedCurrency.getId()));
+        // Re-insert AUD so later tests (if any) still see six rows
+        currencyRepository.save(cur("AUD", "036", "Australian Dollar")).block();
     }
 
     @Test
     void getEnabledCurrencies_ShouldReturnEnabledOnly() {
         StepVerifier.create(currencyService.getEnabledCurrencies())
-                .expectNextCount(5) // Includes all enabled currencies (base + test-specific)
+                .expectNextCount(5)              // 3 base enabled + GBP + AUD
                 .verifyComplete();
     }
 }

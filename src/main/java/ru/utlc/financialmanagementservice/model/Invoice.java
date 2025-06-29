@@ -5,7 +5,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -27,11 +26,12 @@ public class Invoice extends AuditingEntity<Long> {
 
     @Id
     private Long id;
-    private Integer clientId;
+
+    private InvoiceDirection direction;
+    private Long partnerId;
     private Integer serviceTypeId;
     private BigDecimal totalAmount;
-    @Transient private BigDecimal amountPaid;
-    @Transient private BigDecimal outstandingBalance;
+    private BigDecimal paidAmount;
     private Integer currencyId;
     private LocalDate issueDate;
     private LocalDate dueDate;
@@ -40,4 +40,8 @@ public class Invoice extends AuditingEntity<Long> {
     private Integer statusId;
     @Version
     private Long version;
+
+    public BigDecimal getOutstandingBalance() {
+        return totalAmount.subtract(paidAmount != null ? paidAmount : BigDecimal.ZERO);
+    }
 }

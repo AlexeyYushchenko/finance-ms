@@ -21,7 +21,6 @@ import ru.utlc.financialmanagementservice.model.ServiceType;
 import ru.utlc.financialmanagementservice.repository.ServiceTypeRepository;
 import ru.utlc.financialmanagementservice.service.ServiceTypeService;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -118,7 +117,6 @@ class ServiceTypeServiceIT extends IntegrationTestBase {
         assertNull(cacheManager.getCache(SERVICE_TYPES).get("all"));
     }
 
-
     @Test
     void update_ShouldModifyExistingServiceType() {
         ServiceType testServiceType = testServiceTypes.get(0);
@@ -145,5 +143,24 @@ class ServiceTypeServiceIT extends IntegrationTestBase {
                 .verifyComplete();
 
         assertNull(cacheManager.getCache(SERVICE_TYPES).get(testServiceType.getId()));
+    }
+
+    // New test: Try to delete a non-existent entity
+    @Test
+    void deleteNonExistentServiceType_ShouldReturnFalse() {
+        // Using an ID that is unlikely to exist
+        StepVerifier.create(serviceTypeService.delete(9999))
+                .expectNext(false)
+                .verifyComplete();
+    }
+
+    // New test: Try to update a non-existent entity
+    @Test
+    void updateNonExistentServiceType_ShouldThrowServiceTypeNotFoundException() {
+        ServiceTypeCreateUpdateDto updateDto = new ServiceTypeCreateUpdateDto("Non-existent", "This service type does not exist");
+
+        StepVerifier.create(serviceTypeService.update(9999, updateDto))
+                .expectErrorMatches(throwable -> throwable instanceof ServiceTypeNotFoundException)
+                .verify();
     }
 }

@@ -21,7 +21,7 @@ public class Currency extends AuditingEntity<Integer> {
     @Id
     private Integer id;
     private String code;
-    private Integer okvCode;
+    private String okvCode;
     private String name;
     private Boolean enabled;
 }

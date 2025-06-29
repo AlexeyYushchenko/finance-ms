@@ -11,6 +11,13 @@ public abstract class AbstractNotFoundException extends RuntimeException {
         this.args = args;
     }
 
+    // This constructor allows subclasses to provide a default message key
+    protected AbstractNotFoundException(Object... args) {
+        super(); // super() is needed, but it will be overridden by subclasses
+        this.message = getDefaultMessageKey(); // Fetch default key from subclass
+        this.args = args;
+    }
+
     public String getMessage() {
         return message;
     }
@@ -18,4 +25,7 @@ public abstract class AbstractNotFoundException extends RuntimeException {
     public Object[] getArgs() {
         return args;
     }
+
+    // Subclasses should override this method to provide their own message key
+    protected abstract String getDefaultMessageKey();
 }

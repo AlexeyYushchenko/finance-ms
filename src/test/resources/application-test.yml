@@ -15,3 +15,7 @@ spring:
     pool:
       initial-size: 10
       max-size: 20
+
+
+  main:
+    allow-bean-definition-overriding: true

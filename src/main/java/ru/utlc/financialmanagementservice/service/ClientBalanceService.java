@@ -5,91 +5,157 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import ru.utlc.financialmanagementservice.dto.clientbalance.ClientBalanceReadDto;
-import ru.utlc.financialmanagementservice.exception.ClientNotFoundException;
-import ru.utlc.financialmanagementservice.mapper.ClientBalanceMapper;
-import ru.utlc.financialmanagementservice.model.ClientBalance;
-import ru.utlc.financialmanagementservice.model.Invoice;
-import ru.utlc.financialmanagementservice.model.Payment;
-import ru.utlc.financialmanagementservice.repository.ClientBalanceRepository;
+import ru.utlc.financialmanagementservice.dto.clientbalance.ClientBalanceReportDto;
+import ru.utlc.financialmanagementservice.dto.clientbalance.ClientBalanceRowDto;
+import ru.utlc.financialmanagementservice.dto.currency.CurrencyReadDto;
+import ru.utlc.financialmanagementservice.model.InvoiceAggregate;
+import ru.utlc.financialmanagementservice.model.PaymentLeftoverAggregate;
+import ru.utlc.financialmanagementservice.repository.InvoiceRepository;
+import ru.utlc.financialmanagementservice.repository.PaymentRepository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-@Slf4j
+/*
+ * Copyright (c) 2024, ООО Ю-ТЛК МОСКВА. All rights reserved.
+ * Licensed under Proprietary License.
+ *
+ * Author: Алексей Ющенко, ООО Ю-ТЛК МОСКВА
+ * Date: 2024-08-19
+ */
+
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ClientBalanceService {
 
-    private final ClientBalanceRepository clientBalanceRepository;
-    private final ClientBalanceMapper clientBalanceMapper;
+    private final PaymentRepository paymentRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final CurrencyService currencyService;
+    private final ExchangeRateService exchangeRateService;
 
-    public Flux<ClientBalanceReadDto> findAll() {
-        return clientBalanceRepository.findAll()
-                .map(clientBalanceMapper::toDto);
-    }
+    private static final int RUB_CURRENCY_ID = 1;
 
-    public Flux<ClientBalanceReadDto> findByClientId(Integer clientId) {
-        return clientBalanceRepository.findAllByClientId(clientId)
-                .switchIfEmpty(Mono.error(new ClientNotFoundException("error.client.notFound", clientId)))
-                .map(clientBalanceMapper::toDto);
-    }
+    /**
+     * Build a balance report for the given partner, at the given date.
+     */
+    public Mono<ClientBalanceReportDto> getClientBalance(Long partnerId, LocalDate reportDate) {
 
-    public Mono<ClientBalanceReadDto> findByClientIdAndCurrencyId(Integer clientId, Integer currencyId) {
-        return clientBalanceRepository.findByClientIdAndCurrencyId(clientId, currencyId)
-                .map(clientBalanceMapper::toDto);
-    }
+        // 1) Payment leftover
+        Mono<List<PaymentLeftoverAggregate>> leftoverMono =
+                paymentRepository.sumLeftoverByPartner(partnerId).collectList();
 
-    // General balance adjustment method
-    public Mono<Void> adjustBalance(Integer clientId, Integer currencyId, BigDecimal amount) {
-        return clientBalanceRepository.findByClientIdAndCurrencyId(clientId, currencyId)
-                .flatMap(existingBalance -> {
-                    existingBalance.setBalance(existingBalance.getBalance().add(amount));
-                    return clientBalanceRepository.save(existingBalance);
+        // 2) Invoice aggregator
+        Mono<List<InvoiceAggregate>> invoiceMono =
+                invoiceRepository.sumInvoicesByPartner(partnerId).collectList();
+
+        // 3) Combine them, then build the final rows
+        return Mono.zip(leftoverMono, invoiceMono)
+                .flatMap(tuple -> {
+                    List<PaymentLeftoverAggregate> leftoverAggs = tuple.getT1();
+                    List<InvoiceAggregate> invoiceAggs = tuple.getT2();
+                    return buildRows(leftoverAggs, invoiceAggs, reportDate)
+                            .collectList(); // gather all row flux
                 })
-                .switchIfEmpty(clientBalanceRepository.save(
-                        new ClientBalance(clientId, currencyId, amount)
-                ))
-                .then();
+                .map(rows -> {
+                    // 4) Sum up leftoverRub & outstandingRub across all rows
+                    BigDecimal totalLeftoverRub = rows.stream()
+                            .map(ClientBalanceRowDto::leftoverRub)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    BigDecimal totalOutstandingRub = rows.stream()
+                            .map(ClientBalanceRowDto::outstandingRub)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    return new ClientBalanceReportDto(
+                            partnerId,
+                            reportDate,
+                            rows,
+                            totalLeftoverRub,
+                            totalOutstandingRub
+                    );
+                });
     }
 
-    public Mono<Payment> adjustBalance(Payment payment) {
-        return adjustBalance(payment.getClientId(), payment.getCurrencyId(), payment.getTotalAmount())
-                .thenReturn(payment);
+    /**
+     * Merges Payment leftover & Invoice aggregator data, grouping by currency,
+     * then converts leftover & outstanding to rub.
+     */
+    private Flux<ClientBalanceRowDto> buildRows(
+            List<PaymentLeftoverAggregate> leftoverAggs,
+            List<InvoiceAggregate> invoiceAggs,
+            LocalDate reportDate
+    ) {
+        // Convert them to maps for easy lookup
+        Map<Integer, BigDecimal> leftoverMap = leftoverAggs.stream()
+                .collect(Collectors.toMap(
+                        PaymentLeftoverAggregate::currencyId,
+                        PaymentLeftoverAggregate::leftoverSum
+                ));
+
+        Map<Integer, InvoiceAggregate> invoiceMap = invoiceAggs.stream()
+                .collect(Collectors.toMap(
+                        InvoiceAggregate::currencyId,
+                        agg -> agg
+                ));
+
+        // Union set of currency IDs
+        Set<Integer> allCurrencies = new HashSet<>(leftoverMap.keySet());
+        allCurrencies.addAll(invoiceMap.keySet());
+
+        // We'll fetch all currency codes in memory => ID->"RUB"/"USD" etc.
+        return currencyService.findAll()
+                .collectMap(CurrencyReadDto::id, CurrencyReadDto::code)
+                .flatMapMany(codeMap -> Flux.fromIterable(allCurrencies)
+                        .flatMap(currId -> {
+                            // Payment leftover
+                            BigDecimal leftover = leftoverMap.getOrDefault(currId, BigDecimal.ZERO);
+
+                            // Invoice aggregator
+                            InvoiceAggregate inv = invoiceMap.get(currId);
+                            BigDecimal unpaid = (inv != null) ? inv.totalUnpaid() : BigDecimal.ZERO;
+                            BigDecimal partial = (inv != null) ? inv.partiallyPaid() : BigDecimal.ZERO;
+                            BigDecimal outstanding = (inv != null) ? inv.outstanding() : BigDecimal.ZERO;
+
+                            String code = codeMap.getOrDefault(currId, "???");
+
+                            // We'll convert leftover->rub, outstanding->rub, then build row
+                            return convertToRub(currId, leftover, reportDate)
+                                    .zipWith(convertToRub(currId, outstanding, reportDate))
+                                    .map(tuple -> {
+                                        BigDecimal leftoverRub = tuple.getT1();
+                                        BigDecimal outRub = tuple.getT2();
+
+                                        return new ClientBalanceRowDto(
+                                                currId,
+                                                code,
+                                                leftover,
+                                                unpaid,
+                                                partial,
+                                                outstanding,
+                                                leftoverRub,
+                                                outRub
+                                        );
+                                    });
+                        })
+                );
     }
 
-    public Mono<Invoice> adjustBalance(Invoice invoice) {
-        return adjustBalance(invoice.getClientId(), invoice.getCurrencyId(), invoice.getTotalAmount().negate())
-                .thenReturn(invoice);
-    }
-
-    public Mono<Payment> negateExistingPayment(Payment payment) {
-        return adjustBalance(payment.getClientId(), payment.getCurrencyId(), payment.getTotalAmount().negate())
-                .thenReturn(payment);
-    }
-
-    public Mono<Invoice> negateExistingInvoice(Invoice invoice) {
-        return adjustBalance(invoice.getClientId(), invoice.getCurrencyId(), invoice.getTotalAmount())
-                .thenReturn(invoice);
-    }
-
-    public Mono<Payment> updateBalanceForNewPayment(Payment payment) {
-        log.info("ClientBalanceService.updateBalanceForNewPayment()");
-        return adjustBalance(payment).thenReturn(payment);
-    }
-
-    public Mono<Invoice> updateBalanceForNewInvoice(Invoice invoice) {
-        return adjustBalance(invoice).thenReturn(invoice);
-    }
-
-    public Mono<Void> adjustBalanceForPaymentDeletion(Payment payment) {
-        return adjustBalance(payment.getClientId(), payment.getCurrencyId(), payment.getTotalAmount().negate());
-    }
-    public Mono<Void> adjustBalanceForInvoiceDeletion(Invoice invoice) {
-        return adjustBalance(invoice.getClientId(), invoice.getCurrencyId(), invoice.getTotalAmount());
-    }
-
-    public Mono<Void> adjustBalanceForInvoiceDeletion(Integer clientId, Integer currencyId, BigDecimal amount) {
-        // Add the invoice amount back to the balance
-        return adjustBalance(clientId, currencyId, amount);
+    /**
+     * Convert the given amount from {currencyId} to RUB at {reportDate}.
+     * If it's already RUB, just return the same.
+     */
+    private Mono<BigDecimal> convertToRub(Integer currencyId, BigDecimal amount, LocalDate reportDate) {
+        if (currencyId.equals(RUB_CURRENCY_ID)) {
+            return Mono.just(amount);
+        }
+        return exchangeRateService.getExchangeRate(currencyId, RUB_CURRENCY_ID, reportDate)
+                .map(rate -> amount.multiply(rate).setScale(2, RoundingMode.HALF_UP));
     }
 }

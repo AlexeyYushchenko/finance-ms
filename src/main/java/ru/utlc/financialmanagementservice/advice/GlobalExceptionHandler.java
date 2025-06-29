@@ -19,7 +19,6 @@ import ru.utlc.financialmanagementservice.exception.*;
 import ru.utlc.financialmanagementservice.response.Response;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -103,7 +102,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(BAD_REQUEST)
     public ResponseEntity<Response> handleEntityUpdateException(PaymentUpdateException ex) {
         log.error(ex.getMessage());
-        String errorMessage = messageSource.getMessage("error.payment.update", null, LocaleContextHolder.getLocale());
+        String errorMessage = messageSource.getMessage(ex.getMessage(), null, LocaleContextHolder.getLocale());
         return ResponseEntity.status(BAD_REQUEST).body(new Response(errorMessage));
     }
 

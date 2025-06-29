@@ -5,14 +5,17 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.paymenttype.PaymentTypeReadDto;
+import ru.utlc.financialmanagementservice.dto.referencetype.ReferenceTypeCreateUpdateDto;
+import ru.utlc.financialmanagementservice.dto.referencetype.ReferenceTypeReadDto;
 import ru.utlc.financialmanagementservice.model.PaymentType;
+import ru.utlc.financialmanagementservice.model.ReferenceType;
 
 @Mapper
-public interface PaymentTypeMapper {
+public interface ReferenceTypeMapper {
     @Mapping(target = "auditingInfoDto", source = ".")
-    PaymentTypeReadDto toDto(PaymentType paymentType);  // Entity to DTO
+    ReferenceTypeReadDto toDto(ReferenceType referenceType);
 
-    PaymentType toEntity(PaymentTypeCreateUpdateDto createUpdateDto);  // DTO to Entity
+    ReferenceType toEntity(ReferenceTypeCreateUpdateDto createUpdateDto);
 
-    PaymentType update(@MappingTarget PaymentType paymentType, PaymentTypeCreateUpdateDto createUpdateDto);
+    ReferenceType update(@MappingTarget ReferenceType referenceType, ReferenceTypeCreateUpdateDto createUpdateDto);
 }

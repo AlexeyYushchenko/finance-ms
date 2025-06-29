@@ -16,7 +16,7 @@ import org.springframework.data.relational.core.mapping.Table;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "service_type")
+@Table("service_type")
 public class ServiceType extends AuditingEntity<Integer> {
 
     @Id

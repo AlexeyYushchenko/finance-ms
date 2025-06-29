@@ -8,341 +8,291 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.context.support.DependencyInjectionTestExecutionListener;
-import org.springframework.test.context.support.DirtiesContextTestExecutionListener;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import ru.utlc.financialmanagementservice.dto.invoice.InvoiceCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.invoice.InvoiceReadDto;
 import ru.utlc.financialmanagementservice.exception.InvoiceNotFoundException;
-import ru.utlc.financialmanagementservice.service.ClientBalanceService;
+import ru.utlc.financialmanagementservice.exception.InvoiceUpdateException;
+import ru.utlc.financialmanagementservice.model.InvoiceDirection;
 import ru.utlc.financialmanagementservice.service.InvoiceService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/*
- * Integration tests for InvoiceService.
- * Ensures that CRUD operations on invoices correctly adjust client balances.
- */
-@TestExecutionListeners(
-        listeners = {
-                DependencyInjectionTestExecutionListener.class,
-                DirtiesContextTestExecutionListener.class
-        },
-        mergeMode = TestExecutionListeners.MergeMode.REPLACE_DEFAULTS
-)
 @ExtendWith(SpringExtension.class)
-@Testcontainers
-@ActiveProfiles("test")
 @SpringBootTest
-@RequiredArgsConstructor
-    class InvoiceServiceIT extends IntegrationTestBase {
+@ActiveProfiles("test")
+@Testcontainers
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
+class InvoiceServiceIT {
 
-    @Autowired
-    private DatabaseClient databaseClient;
-
-    @Autowired
-    private InvoiceService invoiceService;
-
-    @Autowired
-    private ClientBalanceService clientBalanceService;
-
-    // Constants for test data
-    private static final Integer CLIENT_ID = 1;
-    private static final Integer UPDATED_CLIENT_ID = 2;
-    private static final Integer CURRENCY_ID = 1;
-    private static final Integer UPDATED_CURRENCY_ID = 2;
+    private static final Long PARTNER_ID_1 = 1L;
+    private static final Long PARTNER_ID_2 = 2L;
     private static final Integer SERVICE_TYPE_ID = 1;
-    private static final Integer UPDATED_SERVICE_TYPE_ID = 2;
-    private static final Integer STATUS_ID = 1;
-    private static final Integer UPDATED_STATUS_ID = 2;
-    private static final BigDecimal TOTAL_AMOUNT = new BigDecimal("500.00");
-    private static final BigDecimal UPDATED_TOTAL_AMOUNT = new BigDecimal("600.00");
-    private static final LocalDate ISSUE_DATE = LocalDate.now();
-    private static final LocalDate UPDATED_ISSUE_DATE = ISSUE_DATE.plusDays(1);
-    private static final LocalDate DUE_DATE = ISSUE_DATE.plusDays(30);
-    private static final LocalDate UPDATED_DUE_DATE = DUE_DATE.plusDays(10);
-    private static final String COMMENTARY = "Initial Invoice";
-    private static final String UPDATED_COMMENTARY = "Updated Invoice";
-    private static final Long SHIPMENT_ID = 100L;
-    private static final Long UPDATED_SHIPMENT_ID = 200L;
+    private static final BigDecimal TOTAL_AMOUNT_1 = new BigDecimal("1000.00");
+    private static final BigDecimal TOTAL_AMOUNT_2 = new BigDecimal("2000.00");
+    private static final LocalDate ISSUE_DATE_1 = LocalDate.now();
+    private static final LocalDate DUE_DATE_1 = ISSUE_DATE_1.plusDays(30);
+    private static final LocalDate ISSUE_DATE_2 = ISSUE_DATE_1.plusDays(5);
+    private static final LocalDate DUE_DATE_2 = ISSUE_DATE_2.plusDays(30);
+    private static final String COMMENT_1 = "Initial Invoice";
+    private static final String COMMENT_2 = "Updated Invoice";
+    private static final int STATUS_DRAFT = 1;
+    private static final int STATUS_ACTIVE = 2;
+
+    private final DatabaseClient databaseClient;
+    private final InvoiceService invoiceService;
 
     @BeforeEach
     void resetDatabase() {
-        // Truncate all tables or reset sequences
-        // Example using R2DBC DatabaseClient
-        databaseClient.sql("TRUNCATE TABLE invoice, client_balance RESTART IDENTITY CASCADE").fetch().rowsUpdated().block();
+        // Only truncate invoice table; partner is external now
+        databaseClient
+                .sql("TRUNCATE TABLE invoice RESTART IDENTITY CASCADE")
+                .fetch()
+                .rowsUpdated()
+                .block();
     }
 
-
-    /**
-     * Test to verify the number of invoices in the database.
-     */
-    @Test
-    public void testSize() {
-        // 1) (Optional) Reset or verify the DB is empty
-        //    If you truncate in @BeforeEach, it should be empty at this point.
-
-        // 2) Create some Invoices for this test
-        InvoiceCreateUpdateDto dto1 = new InvoiceCreateUpdateDto(
-                1,  // clientId
-                1,  // serviceTypeId
-                new BigDecimal("100.00"),
-                LocalDate.now(),
-                LocalDate.now().plusDays(30),
-                "Invoice #1",
-                1,   // currencyId
-                10L, // shipmentId
-                1    // statusId
-        );
-
-        InvoiceCreateUpdateDto dto2 = new InvoiceCreateUpdateDto(
-                2,  // clientId
-                2,  // serviceTypeId
-                new BigDecimal("200.00"),
-                LocalDate.now(),
-                LocalDate.now().plusDays(15),
-                "Invoice #2",
-                2,   // currencyId
-                20L, // shipmentId
-                2    // statusId
-        );
-
-        invoiceService.create(dto1).block();
-        invoiceService.create(dto2).block();
-
-        // 3) Now check the total count
-        StepVerifier.create(invoiceService.findAll().collectList())
-                .assertNext(invoices -> {
-                    // We inserted exactly 2 in this test
-                    assertEquals(2, invoices.size());
-                })
-                .verifyComplete();
-    }
-
-
-    /**
-     * Test the 'create' method.
-     * Verifies that an invoice is created correctly and the client's balance is adjusted accordingly.
-     */
-    @Test
-    public void testCreateInvoice() {
+    private Mono<InvoiceReadDto> createInvoiceMono(
+            Long partnerId,
+            Integer serviceTypeId,
+            BigDecimal totalAmount,
+            LocalDate issueDate,
+            LocalDate dueDate,
+            String commentary,
+            Integer currencyId,
+            Long shipmentId,
+            Integer statusId
+    ) {
         InvoiceCreateUpdateDto dto = new InvoiceCreateUpdateDto(
-                CLIENT_ID,
-                SERVICE_TYPE_ID,
-                TOTAL_AMOUNT,
-                ISSUE_DATE,
-                DUE_DATE,
-                COMMENTARY,
-                CURRENCY_ID,
-                SHIPMENT_ID,
-                STATUS_ID
+                InvoiceDirection.RECEIVABLE,
+                partnerId,
+                serviceTypeId,
+                totalAmount,
+                issueDate,
+                dueDate,
+                commentary,
+                currencyId,
+                shipmentId,
+                statusId
         );
-
-        Mono<InvoiceReadDto> resultMono = invoiceService.create(dto);
-
-        StepVerifier.create(resultMono)
-                .assertNext(result -> {
-                    assertEquals(CLIENT_ID, result.clientId().intValue());
-                    assertEquals(SERVICE_TYPE_ID, result.serviceTypeId().intValue());
-                    assertEquals(TOTAL_AMOUNT, result.totalAmount());
-                    assertEquals(ISSUE_DATE, result.issueDate());
-                    assertEquals(DUE_DATE, result.dueDate());
-                    assertEquals(COMMENTARY, result.commentary());
-                    assertEquals(CURRENCY_ID, result.currencyId().intValue());
-                    assertEquals(SHIPMENT_ID, result.shipmentId());
-                    assertEquals(STATUS_ID, result.statusId().intValue());
-                })
-                .verifyComplete();
-
-        // Verify the client balance is adjusted correctly
-        StepVerifier.create(clientBalanceService.findByClientIdAndCurrencyId(CLIENT_ID, CURRENCY_ID))
-                .assertNext(balance -> {
-                    // Ensure the balance is -500.00
-                    System.out.println("balance.balance(): " + balance.balance());
-                    System.out.println("TOTAL_AMOUNT.negate(): " + TOTAL_AMOUNT.negate());
-                    assertEquals(0, balance.balance().compareTo(TOTAL_AMOUNT.negate()));
-                })
-                .verifyComplete();
+        return invoiceService.create(dto);
     }
 
-    /**
-     * Test the 'update' method with all fields.
-     * Verifies that an existing invoice is updated correctly and the client's balance is adjusted accordingly.
-     */
     @Test
-    public void testUpdateInvoiceWithAllFields() {
-        // First, create an invoice to update
-        InvoiceCreateUpdateDto createDto = new InvoiceCreateUpdateDto(
-                CLIENT_ID,
-                SERVICE_TYPE_ID,
-                TOTAL_AMOUNT,
-                ISSUE_DATE,
-                DUE_DATE,
-                COMMENTARY,
-                CURRENCY_ID,
-                SHIPMENT_ID,
-                STATUS_ID
-        );
-
-        Mono<InvoiceReadDto> createdInvoiceMono = invoiceService.create(createDto);
-
-        InvoiceReadDto createdInvoice = createdInvoiceMono.block();
-
-        assert createdInvoice != null; // Ensure invoice was created
-
-        // Now, update the invoice
-        InvoiceCreateUpdateDto updateDto = new InvoiceCreateUpdateDto(
-                UPDATED_CLIENT_ID,
-                UPDATED_SERVICE_TYPE_ID,
-                UPDATED_TOTAL_AMOUNT,
-                UPDATED_ISSUE_DATE,
-                UPDATED_DUE_DATE,
-                UPDATED_COMMENTARY,
-                UPDATED_CURRENCY_ID,
-                UPDATED_SHIPMENT_ID,
-                UPDATED_STATUS_ID
-        );
-
-        Mono<InvoiceReadDto> updatedInvoiceMono = invoiceService.update(createdInvoice.id(), updateDto);
-
-        StepVerifier.create(updatedInvoiceMono)
-                .assertNext(result -> {
-                    assertEquals(UPDATED_CLIENT_ID, result.clientId().intValue());
-                    assertEquals(UPDATED_SERVICE_TYPE_ID, result.serviceTypeId().intValue());
-                    assertEquals(UPDATED_TOTAL_AMOUNT, result.totalAmount());
-                    assertEquals(UPDATED_ISSUE_DATE, result.issueDate());
-                    assertEquals(UPDATED_DUE_DATE, result.dueDate());
-                    assertEquals(UPDATED_COMMENTARY, result.commentary());
-                    assertEquals(UPDATED_CURRENCY_ID, result.currencyId().intValue());
-                    assertEquals(UPDATED_SHIPMENT_ID, result.shipmentId());
-                    assertEquals(UPDATED_STATUS_ID, result.statusId().intValue());
-                })
-                .verifyComplete();
-
-        // Verify the client balance adjustments
-        // Original invoice adjusted CLIENT_ID's balance by -500
-        // Updated invoice moves from CLIENT_ID=1 to CLIENT_ID=2 and adjusts by -600
-        // So, CLIENT_ID=1's balance should be +500 (restored to 0)
-        // CLIENT_ID=2's balance should be -600
-//        StepVerifier.create(clientBalanceService.findByClientIdAndCurrencyId(CLIENT_ID, CURRENCY_ID))
-//                .assertNext(balance -> {
-//                    // Ensure the balance is 0
-//                    System.out.println("balance.balance(): " + balance.balance());
-//                    System.out.println("UPDATED_TOTAL_AMOUNT.negate(): " + UPDATED_TOTAL_AMOUNT.negate());
-//                    assertEquals(0, balance.balance().compareTo(BigDecimal.ZERO));
-//                })
-//                .verifyComplete();
-
-        StepVerifier.create(clientBalanceService.findByClientIdAndCurrencyId(UPDATED_CLIENT_ID, UPDATED_CURRENCY_ID))
-                .assertNext(balance -> {
-                    // Ensure the balance is -600.00
-                    System.out.println("balance.balance(): " + balance.balance());
-                    System.out.println("UPDATED_TOTAL_AMOUNT.negate(): " + UPDATED_TOTAL_AMOUNT.negate());
-                    assertEquals(0, balance.balance().compareTo(UPDATED_TOTAL_AMOUNT.negate()));
-                })
-                .verifyComplete();
-    }
-
-    /**
-     * Test the 'delete' method.
-     * Verifies that an existing invoice is deleted correctly and the client's balance is adjusted accordingly.
-     */
-    @Test
-    public void testDeleteInvoice() {
-        // First, create an invoice to delete
+    void testCreateInvoice() {
         InvoiceCreateUpdateDto dto = new InvoiceCreateUpdateDto(
-                CLIENT_ID,
+                InvoiceDirection.RECEIVABLE,
+                PARTNER_ID_1,
                 SERVICE_TYPE_ID,
-                TOTAL_AMOUNT,
-                ISSUE_DATE,
-                DUE_DATE,
-                COMMENTARY,
-                CURRENCY_ID,
-                SHIPMENT_ID,
-                STATUS_ID
+                TOTAL_AMOUNT_1,
+                ISSUE_DATE_1,
+                DUE_DATE_1,
+                COMMENT_1,
+                1,
+                100L,
+                STATUS_DRAFT
         );
 
-        Mono<InvoiceReadDto> createdInvoiceMono = invoiceService.create(dto);
-
-        InvoiceReadDto createdInvoice = createdInvoiceMono.block();
-
-        assert createdInvoice != null; // Ensure invoice was created
-
-        // Now, delete the invoice
-        Mono<Boolean> deleteResultMono = invoiceService.delete(createdInvoice.id());
-
-        StepVerifier.create(deleteResultMono)
-                .expectNext(true)
-                .verifyComplete();
-
-        // Attempt to delete again, should return false
-        StepVerifier.create(invoiceService.delete(createdInvoice.id()))
-                .expectNext(false)
-                .verifyComplete();
-
-        // Verify the client balance is adjusted correctly (adding back the total amount)
-        StepVerifier.create(clientBalanceService.findByClientIdAndCurrencyId(CLIENT_ID, CURRENCY_ID))
-                .assertNext(balance -> {
-                    // Ensure the balance is 0
-                    assertEquals(0, balance.balance().compareTo(BigDecimal.ZERO));
+        StepVerifier.create(invoiceService.create(dto))
+                .assertNext(inv -> {
+                    assertEquals(PARTNER_ID_1, inv.partnerId());
+                    assertEquals(SERVICE_TYPE_ID, inv.serviceTypeId());
+                    assertEquals(TOTAL_AMOUNT_1, inv.totalAmount());
+                    assertEquals(ISSUE_DATE_1, inv.issueDate());
+                    assertEquals(DUE_DATE_1, inv.dueDate());
+                    assertEquals(COMMENT_1, inv.commentary());
+                    assertEquals(1, inv.currencyId());
+                    assertEquals(100L, inv.shipmentId());
+                    assertEquals(STATUS_DRAFT, inv.statusId());
                 })
                 .verifyComplete();
     }
 
-    /**
-     * Test deleting a non-existent invoice.
-     * Verifies that attempting to delete an invoice that doesn't exist returns false without throwing an exception.
-     */
     @Test
-    public void testDeleteNonExistentInvoice() {
-        Mono<Boolean> result = invoiceService.delete(999L); // Assuming 999L does not exist
+    void testUpdateInvoice_AllowedChanges() {
+        InvoiceReadDto created = createInvoiceMono(
+                PARTNER_ID_1, SERVICE_TYPE_ID, TOTAL_AMOUNT_1,
+                ISSUE_DATE_1, DUE_DATE_1, COMMENT_1,
+                1, 100L, STATUS_DRAFT
+        ).block();
 
-        StepVerifier.create(result)
-                .expectNext(false)
+        InvoiceCreateUpdateDto updateDto = new InvoiceCreateUpdateDto(
+                InvoiceDirection.RECEIVABLE,
+                created.partnerId(),
+                2,
+                new BigDecimal("1500.00"),
+                created.issueDate(),
+                created.dueDate(),
+                COMMENT_2,
+                created.currencyId(),
+                created.shipmentId(),
+                STATUS_ACTIVE
+        );
+
+        StepVerifier.create(invoiceService.update(created.id(), updateDto))
+                .assertNext(inv -> assertEquals(new BigDecimal("1500.00"), inv.totalAmount()))
                 .verifyComplete();
     }
 
-    /**
-     * Test updating a non-existent invoice.
-     * Verifies that attempting to update an invoice that doesn't exist results in an empty Mono.
-     */
     @Test
-    public void testUpdateNonExistentInvoice() {
-        InvoiceCreateUpdateDto updateDto = new InvoiceCreateUpdateDto(
-                CLIENT_ID,
-                SERVICE_TYPE_ID,
-                TOTAL_AMOUNT,
-                ISSUE_DATE,
-                DUE_DATE,
-                COMMENTARY,
-                CURRENCY_ID,
-                SHIPMENT_ID,
-                STATUS_ID
+    void testUpdateInvoice_ChangePartner_ShouldFail() {
+        InvoiceReadDto created = createInvoiceMono(
+                PARTNER_ID_1, SERVICE_TYPE_ID, TOTAL_AMOUNT_1,
+                ISSUE_DATE_1, DUE_DATE_1, COMMENT_1,
+                1, 100L, STATUS_DRAFT
+        ).block();
+
+        InvoiceCreateUpdateDto invalid = new InvoiceCreateUpdateDto(
+                InvoiceDirection.RECEIVABLE,
+                PARTNER_ID_2,
+                created.serviceTypeId(),
+                created.totalAmount(),
+                created.issueDate(),
+                created.dueDate(),
+                created.commentary(),
+                created.currencyId(),
+                created.shipmentId(),
+                created.statusId()
         );
 
-        Mono<InvoiceReadDto> resultMono = invoiceService.update(999L, updateDto); // Assuming 999L does not exist
-
-        StepVerifier.create(resultMono)
-                .expectComplete() // Expects the Mono to complete without emitting a value
+        StepVerifier.create(invoiceService.update(created.id(), invalid))
+                .expectError(InvoiceUpdateException.class)
                 .verify();
     }
 
     @Test
-    public void testFindInvoiceById_NonExistent_ThrowsException() {
-        Mono<InvoiceReadDto> resultMono = invoiceService.findById(999L); // Non-existing ID
+    void testUpdateInvoice_ChangeCurrency_ShouldFail() {
+        InvoiceReadDto created = createInvoiceMono(
+                PARTNER_ID_1, SERVICE_TYPE_ID, TOTAL_AMOUNT_1,
+                ISSUE_DATE_1, DUE_DATE_1, COMMENT_1,
+                1, 100L, STATUS_DRAFT
+        ).block();
 
-        StepVerifier.create(resultMono)
-                .expectErrorMatches(throwable ->
-                        throwable instanceof InvoiceNotFoundException
-                                && throwable.getMessage().contains("error.invoice.notFound"))
+        InvoiceCreateUpdateDto invalid = new InvoiceCreateUpdateDto(
+                InvoiceDirection.RECEIVABLE,
+                created.partnerId(),
+                created.serviceTypeId(),
+                created.totalAmount(),
+                created.issueDate(),
+                created.dueDate(),
+                created.commentary(),
+                2,
+                created.shipmentId(),
+                created.statusId()
+        );
+
+        StepVerifier.create(invoiceService.update(created.id(), invalid))
+                .expectError(InvoiceUpdateException.class)
                 .verify();
     }
 
+    @Test
+    void testUpdateInvoice_ChangeIssueDate_ShouldFail() {
+        InvoiceReadDto created = createInvoiceMono(
+                PARTNER_ID_1, SERVICE_TYPE_ID, TOTAL_AMOUNT_1,
+                ISSUE_DATE_1, DUE_DATE_1, COMMENT_1,
+                1, 100L, STATUS_DRAFT
+        ).block();
+
+        InvoiceCreateUpdateDto invalid = new InvoiceCreateUpdateDto(
+                InvoiceDirection.RECEIVABLE,
+                created.partnerId(),
+                created.serviceTypeId(),
+                created.totalAmount(),
+                created.issueDate().plusDays(1),
+                created.dueDate(),
+                created.commentary(),
+                created.currencyId(),
+                created.shipmentId(),
+                created.statusId()
+        );
+
+        StepVerifier.create(invoiceService.update(created.id(), invalid))
+                .expectError(InvoiceUpdateException.class)
+                .verify();
+    }
+
+    @Test
+    void testUpdateInvoice_AlreadyCancelled_ShouldFail() {
+        InvoiceReadDto created = createInvoiceMono(
+                PARTNER_ID_1, SERVICE_TYPE_ID, TOTAL_AMOUNT_1,
+                ISSUE_DATE_1, DUE_DATE_1, COMMENT_1,
+                1, 100L, STATUS_DRAFT
+        ).block();
+
+        // cancel via delete()
+        invoiceService.delete(created.id()).block();
+
+        InvoiceCreateUpdateDto updateDto = new InvoiceCreateUpdateDto(
+                InvoiceDirection.RECEIVABLE,
+                created.partnerId(),
+                created.serviceTypeId(),
+                created.totalAmount(),
+                created.issueDate(),
+                created.dueDate(),
+                created.commentary(),
+                created.currencyId(),
+                created.shipmentId(),
+                STATUS_ACTIVE
+        );
+
+        StepVerifier.create(invoiceService.update(created.id(), updateDto))
+                .expectError(InvoiceUpdateException.class)
+                .verify();
+    }
+
+    @Test
+    void testUpdateInvoice_PartiallyPaid_ShouldFail() {
+        InvoiceReadDto created = createInvoiceMono(
+                PARTNER_ID_1, SERVICE_TYPE_ID, TOTAL_AMOUNT_1,
+                ISSUE_DATE_1, DUE_DATE_1, COMMENT_1,
+                1, 100L, STATUS_DRAFT
+        ).block();
+
+        // apply partial payment
+        invoiceService.addToPaidAmount(created.id(), new BigDecimal("100.00")).block();
+
+        InvoiceCreateUpdateDto updateDto = new InvoiceCreateUpdateDto(
+                InvoiceDirection.RECEIVABLE,
+                created.partnerId(),
+                created.serviceTypeId(),
+                created.totalAmount(),
+                created.issueDate(),
+                created.dueDate(),
+                created.commentary(),
+                created.currencyId(),
+                created.shipmentId(),
+                STATUS_ACTIVE
+        );
+
+        StepVerifier.create(invoiceService.update(created.id(), updateDto))
+                .expectError(InvoiceUpdateException.class)
+                .verify();
+    }
+
+    @Test
+    void testFindByPartnerId() {
+        // create invoices for partners 1 & 2
+        createInvoiceMono(1L, SERVICE_TYPE_ID, TOTAL_AMOUNT_1, ISSUE_DATE_1, DUE_DATE_1, COMMENT_1, 1, 100L, STATUS_DRAFT).block();
+        createInvoiceMono(2L, SERVICE_TYPE_ID, TOTAL_AMOUNT_2, ISSUE_DATE_1, DUE_DATE_2, COMMENT_1, 1, 101L, STATUS_DRAFT).block();
+        createInvoiceMono(2L, SERVICE_TYPE_ID, TOTAL_AMOUNT_1, ISSUE_DATE_2, DUE_DATE_2, COMMENT_2, 1, 102L, STATUS_ACTIVE).block();
+
+        // partner 2 should have 2 invoices
+        StepVerifier.create(invoiceService.findByPartnerId(2L).collectList())
+                .assertNext(list -> assertEquals(2, list.size()))
+                .verifyComplete();
+
+        // nonexistent partner => error
+        StepVerifier.create(invoiceService.findByPartnerId(9999L))
+                .expectErrorMatches(ex -> ex instanceof InvoiceNotFoundException
+                        && ex.getMessage().contains("error.invoice.partner.notFound"))
+                .verify();
+    }
 }

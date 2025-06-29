@@ -9,5 +9,5 @@ public interface ExchangeRateRepositoryCustom {
      * Performs an upsert (insert or update) for the given ExchangeRate 
      * based on the unique (currency_from_id, currency_to_id, rate_date).
      */
-    Mono<ExchangeRate> upsertExchangeRate(ExchangeRate exchangeRate);
+    Mono<Void> upsertExchangeRate(ExchangeRate exchangeRate);
 }

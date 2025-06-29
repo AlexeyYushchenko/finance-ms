@@ -51,7 +51,7 @@ public class ServiceTypeService {
     @Cacheable(value = SERVICE_TYPES, key = "#p0")
     public Mono<ServiceTypeReadDto> findById(Integer id) {
         return serviceTypeRepository.findById(id)
-                .switchIfEmpty(Mono.error(new ServiceTypeNotFoundException("error.serviceType.notFound", id)))
+                .switchIfEmpty(Mono.error(new ServiceTypeNotFoundException(id)))
                 .map(serviceTypeMapper::toDto);
     }
 
@@ -69,7 +69,7 @@ public class ServiceTypeService {
     @CachePut(value = SERVICE_TYPES, key = "#result.id")
     public Mono<ServiceTypeReadDto> update(Integer id, ServiceTypeCreateUpdateDto dto) {
         return serviceTypeRepository.findById(id)
-                .switchIfEmpty(Mono.error(new ServiceTypeNotFoundException("error.serviceType.notFound", id)))
+                .switchIfEmpty(Mono.error(new ServiceTypeNotFoundException(id)))
                 .flatMap(existingEntity -> {
                     serviceTypeMapper.update(existingEntity, dto);
                     return serviceTypeRepository.save(existingEntity);
@@ -78,7 +78,7 @@ public class ServiceTypeService {
                 .as(transactionalOperator()::transactional);
     }
 
-    @CacheEvict(value = SERVICE_TYPES, allEntries = true) // TODO: Improve to selectively evict cache
+    @CacheEvict(value = SERVICE_TYPES, allEntries = true)
     public Mono<Boolean> delete(Integer id) {
         return serviceTypeRepository.findById(id)
                 .flatMap(existingEntity -> serviceTypeRepository.delete(existingEntity)

@@ -6,8 +6,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record PaymentCreateUpdateDto(
-        @NotNull(message = "{validation.payment.clientId.required}")
-        Integer clientId,
+        @NotNull(message = "{validation.payment.paymentStatus.required}")
+        Integer paymentStatusId,
+
+        @NotNull(message = "{validation.payment.partnerId.required}")
+        Long partnerId,
 
         @PastOrPresent(message = "{validation.payment.paymentDate.pastOrPresent}")
         @NotNull(message = "{validation.payment.paymentDate.required}")

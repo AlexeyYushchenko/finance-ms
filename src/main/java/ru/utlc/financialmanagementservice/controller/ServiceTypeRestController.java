@@ -5,14 +5,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeCreateUpdateDto;
 import ru.utlc.financialmanagementservice.dto.servicetype.ServiceTypeReadDto;
 import ru.utlc.financialmanagementservice.response.Response;
 import ru.utlc.financialmanagementservice.service.ServiceTypeService;
-import ru.utlc.financialmanagementservice.util.ValidationErrorUtil;
 
 import java.net.URI;
 import java.util.List;

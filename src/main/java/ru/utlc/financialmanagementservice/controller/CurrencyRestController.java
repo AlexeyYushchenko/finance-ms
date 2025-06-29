@@ -49,7 +49,7 @@ public class CurrencyRestController {
     }
 
     @PostMapping(consumes = "application/json")
-    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid CurrencyCreateUpdateDto dto) {
+    public Mono<ResponseEntity<Response>> create(@RequestBody @Valid final CurrencyCreateUpdateDto dto) {
         return currencyService.create(dto)
                 .map(currencyReadDto -> {
                     URI location = URI.create("/currencies/" + currencyReadDto.id());
@@ -59,7 +59,7 @@ public class CurrencyRestController {
 
     @PutMapping(value = "/{id}", consumes = "application/json")
     public Mono<ResponseEntity<Response>> update(@PathVariable("id") final Integer id,
-                                                 @RequestBody @Valid CurrencyCreateUpdateDto dto) {
+                                                 @RequestBody @Valid final CurrencyCreateUpdateDto dto) {
         return currencyService.update(id, dto)
                 .map(updatedDto -> ResponseEntity.ok(new Response(updatedDto)))
                 .defaultIfEmpty(ResponseEntity.notFound().build());

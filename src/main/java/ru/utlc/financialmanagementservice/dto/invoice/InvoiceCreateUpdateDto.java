@@ -1,13 +1,18 @@
 package ru.utlc.financialmanagementservice.dto.invoice;
 
 import jakarta.validation.constraints.*;
+import ru.utlc.financialmanagementservice.model.InvoiceDirection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record InvoiceCreateUpdateDto(
-        @NotNull(message = "{validation.invoice.clientId.required}")
-        Integer clientId,
+
+        @NotNull(message = "{validation.invoice.direction.required}")
+        InvoiceDirection direction,
+
+        @NotNull(message = "{validation.invoice.partnerId.required}")
+        Long partnerId,
 
         @NotNull(message = "{validation.invoice.serviceTypeId.required}")
         Integer serviceTypeId,

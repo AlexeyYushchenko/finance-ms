@@ -21,6 +21,7 @@ import ru.utlc.financialmanagementservice.repository.ExchangeRateRepository;
 import ru.utlc.financialmanagementservice.service.ExchangeRateService;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -68,7 +69,7 @@ public class ReciprocalRatesIT extends IntegrationTestBase {
     /**
      * Helper to save (upsert) an ExchangeRate with given official/standard/premium rates.
      */
-    private Mono<ExchangeRate> saveRate(int fromId,
+    private Mono<Void> saveRate(int fromId,
                                         int toId,
                                         LocalDate date,
                                         BigDecimal officialRate,
@@ -174,93 +175,99 @@ public class ReciprocalRatesIT extends IntegrationTestBase {
 
     }
 
-    /**
-     * If 1 USD = 0.9 EUR => USD->EUR=0.9, then EUR->USD=1/0.9=1.1111...
-     */
     @Test
     @DisplayName("Test USD↔EUR reciprocal")
-    void testUsdEurReciprocal() {
-        BigDecimal usdEur = BigDecimal.valueOf(0.9);
-        BigDecimal eurUsd = BigDecimal.valueOf(1.111111).setScale(6, BigDecimal.ROUND_HALF_UP); 
-        // ~1 / 0.9
+    void testUsdEurReciprocal2() {
+        // To achieve USD->EUR = 0.9, we choose:
+        // USD->RUB = 90, EUR->RUB = 100.
+        BigDecimal usdToRub = BigDecimal.valueOf(90);
+        BigDecimal eurToRub = BigDecimal.valueOf(100);
+        BigDecimal expectedUsdEur = usdToRub.divide(eurToRub, 6, RoundingMode.HALF_UP); // 0.9
+        BigDecimal expectedEurUsd = eurToRub.divide(usdToRub, 6, RoundingMode.HALF_UP); // ~1.111111
 
-        // Insert USD->EUR
-        saveRate(USD, EUR, TEST_DATE, usdEur, usdEur, usdEur).block();
-
-        // Insert EUR->USD
-        saveRate(EUR, USD, TEST_DATE, eurUsd, eurUsd, eurUsd).block();
+        // Insert USD->RUB and EUR->RUB rates
+        saveRate(USD, RUB, TEST_DATE, usdToRub, usdToRub, usdToRub).block();
+        saveRate(EUR, RUB, TEST_DATE, eurToRub, eurToRub, eurToRub).block();
 
         // Check USD->EUR
         StepVerifier.create(exchangeRateService.getExchangeRate(USD, EUR, TEST_DATE))
-                .assertNext(rate -> assertEquals(0, usdEur.compareTo(rate), "USD->EUR should be 0.9"))
+                .assertNext(rate -> assertEquals(0, expectedUsdEur.compareTo(rate),
+                        "USD->EUR should be " + expectedUsdEur))
                 .verifyComplete();
 
         // Check EUR->USD
         StepVerifier.create(exchangeRateService.getExchangeRate(EUR, USD, TEST_DATE))
-                .assertNext(rate -> {
-                    assertEquals(0, eurUsd.compareTo(rate), "EUR->USD should be ~1.111111");
-                })
+                .assertNext(rate -> assertEquals(0, expectedEurUsd.compareTo(rate),
+                        "EUR->USD should be " + expectedEurUsd))
                 .verifyComplete();
     }
 
-    /**
-     * If 1 USD = 6.5 CNY => USD->CNY=6.5, CNY->USD=1/6.5=0.153846...
-     */
     @Test
     @DisplayName("Test USD↔CNY reciprocal")
     void testUsdCnyReciprocal() {
-        BigDecimal usdCny = BigDecimal.valueOf(6.5);
-        BigDecimal cnyUsd = BigDecimal.valueOf(0.153846).setScale(6, BigDecimal.ROUND_HALF_UP); 
-        // ~1/6.5
+        // For USD->CNY = 6.5, choose:
+        // USD->RUB = 65, CNY->RUB = 10.
+        BigDecimal usdToRub = BigDecimal.valueOf(65);
+        BigDecimal cnyToRub = BigDecimal.valueOf(10);
+        BigDecimal expectedUsdCny = usdToRub.divide(cnyToRub, 6, RoundingMode.HALF_UP); // 6.5
+        BigDecimal expectedCnyUsd = cnyToRub.divide(usdToRub, 6, RoundingMode.HALF_UP); // ~0.153846
 
-        saveRate(USD, CNY, TEST_DATE, usdCny, usdCny, usdCny).block();
-        saveRate(CNY, USD, TEST_DATE, cnyUsd, cnyUsd, cnyUsd).block();
+        // Insert USD->RUB and CNY->RUB rates
+        saveRate(USD, RUB, TEST_DATE, usdToRub, usdToRub, usdToRub).block();
+        saveRate(CNY, RUB, TEST_DATE, cnyToRub, cnyToRub, cnyToRub).block();
 
         // Check USD->CNY
         StepVerifier.create(exchangeRateService.getExchangeRate(USD, CNY, TEST_DATE))
-                .assertNext(rate -> assertEquals(0, usdCny.compareTo(rate), "USD->CNY=6.5"))
+                .assertNext(rate -> assertEquals(0, expectedUsdCny.compareTo(rate),
+                        "USD->CNY should be " + expectedUsdCny))
                 .verifyComplete();
 
         // Check CNY->USD
         StepVerifier.create(exchangeRateService.getExchangeRate(CNY, USD, TEST_DATE))
-                .assertNext(rate -> {
-                    assertEquals(0, cnyUsd.compareTo(rate), "CNY->USD=~0.153846");
-                })
+                .assertNext(rate -> assertEquals(0, expectedCnyUsd.compareTo(rate),
+                        "CNY->USD should be " + expectedCnyUsd))
                 .verifyComplete();
     }
 
-    /**
-     * If 1 EUR = 7.0 CNY => EUR->CNY=7.0, CNY->EUR=1/7=0.142857...
-     */
     @Test
     @DisplayName("Test EUR↔CNY reciprocal")
     void testEurCnyReciprocal() {
-        BigDecimal eurCny = BigDecimal.valueOf(7.0);
-        BigDecimal cnyEur = BigDecimal.valueOf(0.142857).setScale(6, BigDecimal.ROUND_HALF_UP); 
-        // ~1/7
+        // For EUR->CNY = 7.0, choose:
+        // EUR->RUB = 70, CNY->RUB = 10.
+        BigDecimal eurToRub = BigDecimal.valueOf(70);
+        BigDecimal cnyToRub = BigDecimal.valueOf(10);
+        BigDecimal expectedEurCny = eurToRub.divide(cnyToRub, 6, RoundingMode.HALF_UP); // 7.0
+        BigDecimal expectedCnyEur = cnyToRub.divide(eurToRub, 6, RoundingMode.HALF_UP); // ~0.142857
 
-        saveRate(EUR, CNY, TEST_DATE, eurCny, eurCny, eurCny).block();
-        saveRate(CNY, EUR, TEST_DATE, cnyEur, cnyEur, cnyEur).block();
+        // Insert EUR->RUB and CNY->RUB rates
+        saveRate(EUR, RUB, TEST_DATE, eurToRub, eurToRub, eurToRub).block();
+        saveRate(CNY, RUB, TEST_DATE, cnyToRub, cnyToRub, cnyToRub).block();
 
+        // Check EUR->CNY
         StepVerifier.create(exchangeRateService.getExchangeRate(EUR, CNY, TEST_DATE))
-                .assertNext(rate -> assertEquals(0, eurCny.compareTo(rate), "EUR->CNY=7.0"))
+                .assertNext(rate -> assertEquals(0, expectedEurCny.compareTo(rate),
+                        "EUR->CNY should be " + expectedEurCny))
                 .verifyComplete();
 
+        // Check CNY->EUR
         StepVerifier.create(exchangeRateService.getExchangeRate(CNY, EUR, TEST_DATE))
-                .assertNext(rate -> {
-                    assertEquals(0, cnyEur.compareTo(rate), "CNY->EUR=~0.142857");
-                })
+                .assertNext(rate -> assertEquals(0, expectedCnyEur.compareTo(rate),
+                        "CNY->EUR should be " + expectedCnyEur))
                 .verifyComplete();
     }
 
+
+
+
+
     /**
-     * If 1 RUB = 0.06 CNY => RUB->CNY=0.06, CNY->RUB=16.6666... 
+     * If 1 RUB = 0.06 CNY => RUB->CNY=0.06, CNY->RUB=16.6666...
      */
     @Test
     @DisplayName("Test RUB↔CNY reciprocal")
     void testRubCnyReciprocal() {
         BigDecimal rubCny = BigDecimal.valueOf(0.06);
-        BigDecimal cnyRub = BigDecimal.valueOf(16.666667).setScale(6, BigDecimal.ROUND_HALF_UP); 
+        BigDecimal cnyRub = BigDecimal.valueOf(16.666667).setScale(6, BigDecimal.ROUND_HALF_UP);
         // ~1 / 0.06 = 16.6666...
 
         saveRate(RUB, CNY, TEST_DATE, rubCny, rubCny, rubCny).block();

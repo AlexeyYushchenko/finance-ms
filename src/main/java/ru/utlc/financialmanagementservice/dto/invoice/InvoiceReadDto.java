@@ -1,17 +1,19 @@
 package ru.utlc.financialmanagementservice.dto.invoice;
 
 import ru.utlc.financialmanagementservice.dto.auditinginfo.AuditingInfoDto;
+import ru.utlc.financialmanagementservice.model.InvoiceDirection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record InvoiceReadDto(
         Long id,
-        Integer clientId,
+        InvoiceDirection direction,
+        Long partnerId,
         Integer serviceTypeId,
         BigDecimal totalAmount,
         BigDecimal outstandingBalance,
-        BigDecimal amountPaid,
+        BigDecimal paidAmount,
         Integer currencyId,
         LocalDate issueDate,
         LocalDate dueDate,
