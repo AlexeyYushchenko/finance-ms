@@ -1,2 +1,2 @@
-rootProject.name = "financialmanagementservice"
+rootProject.name = "finance-service"
 include("partner-api")
