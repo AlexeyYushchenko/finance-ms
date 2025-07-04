@@ -82,6 +82,7 @@ dependencies {
 	testImplementation("org.testcontainers:junit-jupiter:1.19.8") // Use consistent Testcontainers version
 
 	implementation("ru.utlc.partner:partner-api:1.0.0")
+	implementation(project(":finance-api"))
 }
 
 tasks.withType<JavaCompile> {
